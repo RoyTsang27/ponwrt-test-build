@@ -45,8 +45,6 @@ sudo apt install -y ack antlr3 asciidoc autoconf automake autopoint binutils bis
   python3-pyelftools qemu-utils re2c rsync scons squashfs-tools subversion swig texinfo uglifyjs \
   upx-ucl unzip vim wget xmlto xxd zlib1g-dev zstd
 
-#  Or use the ImmortalWrt one-click script to install dependencies
-sudo bash -c 'bash <(curl -s https://build-scripts.immortalwrt.org/init_build_environment.sh)'
 
 
 #  Clone the source code
@@ -73,6 +71,9 @@ make -j$(nproc)
 ```
 
 Images are written to `bin/targets/airoha/an7581/` or `bin/targets/airoha/an7583/`.
+
+For signed releases and kernel update checks, see [SECURITY.md](SECURITY.md).
+Release workflows use pinned feeds; development feeds continue to follow upstream.
 
 ## Install
 
