@@ -15,18 +15,13 @@ Update and provide a .get/set_link_ksettings function that use phylink
 for ethtool OPs now that we fully support phylink.
 
 Signed-off-by: Christian Marangi <ansuelsmth@gmail.com>
----
- drivers/net/ethernet/airoha/Kconfig       |   2 +
- drivers/net/ethernet/airoha/airoha_eth.c  | 199 +++++++++++++++++++++-
- drivers/net/ethernet/airoha/airoha_eth.h  |   5 +
- drivers/net/ethernet/airoha/airoha_regs.h |  12 ++
- 4 files changed, 215 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/net/ethernet/airoha/Kconfig b/drivers/net/ethernet/airoha/Kconfig
-index 1f6640a15fc9..5c54a07d2a76 100644
+PonWrt: refresh against Linux 6.18.55. Anchor PHY shutdown to the correct
+function and regenerate non-overlapping hunks for GNU patch.
+---
 --- a/drivers/net/ethernet/airoha/Kconfig
 +++ b/drivers/net/ethernet/airoha/Kconfig
-@@ -20,6 +20,8 @@ config NET_AIROHA
+@@ -20,6 +20,8 @@
  	depends on NET_DSA || !NET_DSA
  	select NET_AIROHA_NPU
  	select PAGE_POOL
@@ -35,8 +30,6 @@ index 1f6640a15fc9..5c54a07d2a76 100644
  	help
  	  This driver supports the gigabit ethernet MACs in the
  	  Airoha SoC family.
-diff --git a/drivers/net/ethernet/airoha/airoha_eth.c b/drivers/net/ethernet/airoha/airoha_eth.c
-index 64619e9a704d..c3827bf9791b 100644
 --- a/drivers/net/ethernet/airoha/airoha_eth.c
 +++ b/drivers/net/ethernet/airoha/airoha_eth.c
 @@ -6,6 +6,7 @@
@@ -47,9 +40,9 @@ index 64619e9a704d..c3827bf9791b 100644
  #include <linux/platform_device.h>
  #include <linux/tcp.h>
  #include <linux/u64_stats_sync.h>
-@@ -1915,10 +1916,18 @@ static int airoha_dev_open(struct net_device *netdev)
- 	struct airoha_qdma *qdma;
- 	int err;
+@@ -1855,10 +1856,18 @@
+ 	u32 cur_len, pse_port = FE_PSE_PORT_PPE1;
+ 	struct airoha_qdma *qdma = dev->qdma;
  
 +	err = phylink_of_phy_connect(dev->phylink, netdev->dev.of_node, 0);
 +	if (err) {
@@ -65,9 +58,9 @@ index 64619e9a704d..c3827bf9791b 100644
 -		return err;
 +		goto err_phy_stop;
  
- 	qdma = airoha_qdma_deref(dev);
- 	if (netdev_uses_dsa(netdev))
-@@ -1938,6 +1947,13 @@ static int airoha_dev_open(struct net_device *netdev)
+ 	/* It seems GDM3 and GDM4 needs SPORT enabled to correctly work */
+ 	if (netdev_uses_dsa(netdev) || port->id > 2)
+@@ -1895,6 +1904,13 @@
  				    pse_port);
  
  	return 0;
@@ -80,23 +73,22 @@ index 64619e9a704d..c3827bf9791b 100644
 +	return err;
  }
  
- static int airoha_dev_stop(struct net_device *netdev)
-@@ -1940,9 +1956,11 @@
- static int airoha_dev_stop(struct net_device *netdev)
- {
- 	struct airoha_gdm_dev *dev = netdev_priv(netdev);
+ static void airoha_set_port_mtu(struct airoha_eth *eth,
+@@ -1927,6 +1943,8 @@
  	struct airoha_gdm_port *port = dev->port;
  	struct airoha_qdma *qdma = dev->qdma;
  	int i;
- 
-+	phylink_stop(dev->phylink);
 +
++	phylink_stop(dev->phylink);
+ 
  	netif_tx_disable(netdev);
  	airoha_set_vip_for_gdm_port(dev, false);
-@@ -2509,6 +2530,24 @@ airoha_ethtool_get_rmon_stats(struct net_device *netdev,
+@@ -2432,6 +2450,24 @@
+ 			stats->hist_tx[i] = hw_stats->tx_len[i];
+ 		}
  	} while (u64_stats_fetch_retry(&dev->stats.syncp, start));
- }
- 
++}
++
 +static int
 +airoha_ethtool_get_link_ksettings(struct net_device *netdev,
 +				  struct ethtool_link_ksettings *cmd)
@@ -113,12 +105,10 @@ index 64619e9a704d..c3827bf9791b 100644
 +	struct airoha_gdm_dev *dev = netdev_priv(netdev);
 +
 +	return phylink_ethtool_ksettings_set(dev->phylink, cmd);
-+}
-+
+ }
+ 
  static int airoha_qdma_set_chan_tx_sched(struct net_device *netdev,
- 					 int channel, enum tx_sched_mode mode,
- 					 const u16 *weights, u8 n_weights)
-@@ -3353,7 +3392,8 @@ static const struct ethtool_ops airoha_ethtool_ops = {
+@@ -3164,7 +3200,8 @@
  	.get_drvinfo		= airoha_ethtool_get_drvinfo,
  	.get_eth_mac_stats      = airoha_ethtool_get_mac_stats,
  	.get_rmon_stats		= airoha_ethtool_get_rmon_stats,
@@ -128,10 +118,12 @@ index 64619e9a704d..c3827bf9791b 100644
  	.get_link		= ethtool_op_get_link,
  };
  
-@@ -3181,6 +3212,155 @@ bool airoha_is_valid_gdm_dev(struct airo
- 	return false;
- }
+@@ -3218,6 +3255,155 @@
+ 	}
  
+ 	return false;
++}
++
 +/* Nothing to do in MAC, everything is handled in PCS */
 +static void airoha_mac_config(struct phylink_config *config, unsigned int mode,
 +			      const struct phylink_link_state *state)
@@ -279,12 +271,10 @@ index 64619e9a704d..c3827bf9791b 100644
 +	dev->phylink = phylink;
 +
 +	return 0;
-+}
-+
+ }
+ 
  static int airoha_alloc_gdm_device(struct airoha_eth *eth,
- 				   struct airoha_gdm_port *port,
- 				   int nbq, struct device_node *np)
-@@ -3244,7 +3424,7 @@ static int airoha_alloc_gdm_device(struc
+@@ -3283,7 +3469,7 @@
  	dev->nbq = nbq;
  	port->devs[index] = dev;
  
@@ -293,7 +283,8 @@ index 64619e9a704d..c3827bf9791b 100644
  }
  
  static int airoha_alloc_gdm_port(struct airoha_eth *eth,
-@@ -3279,6 +3459,7 @@ static int airoha_alloc_gdm_port(struct
+@@ -3318,7 +3504,8 @@
+ 		return -ENOMEM;
  
  	port->id = id;
 -	spin_lock_init(&port->stats_lock);
@@ -302,7 +293,7 @@ index 64619e9a704d..c3827bf9791b 100644
  	eth->ports[p] = port;
  
  	err = airoha_metadata_dst_alloc(port);
-@@ -3470,6 +3650,8 @@ error_napi_stop:
+@@ -3509,6 +3696,8 @@
  			netdev = netdev_from_priv(dev);
  			if (netdev->reg_state == NETREG_REGISTERED)
  				unregister_netdev(netdev);
@@ -311,7 +302,7 @@ index 64619e9a704d..c3827bf9791b 100644
  			of_node_put(netdev->dev.of_node);
  		}
  		airoha_metadata_dst_free(port);
-@@ -3506,6 +3688,7 @@ static void airoha_remove(struct platfor
+@@ -3545,6 +3734,7 @@
  
  			netdev = netdev_from_priv(dev);
  			unregister_netdev(netdev);
@@ -319,11 +310,9 @@ index 64619e9a704d..c3827bf9791b 100644
  			of_node_put(netdev->dev.of_node);
  		}
  		airoha_metadata_dst_free(port);
-diff --git a/drivers/net/ethernet/airoha/airoha_eth.h b/drivers/net/ethernet/airoha/airoha_eth.h
-index fa9a8edce22f..83daec003257 100644
 --- a/drivers/net/ethernet/airoha/airoha_eth.h
 +++ b/drivers/net/ethernet/airoha/airoha_eth.h
-@@ -555,6 +555,9 @@ struct airoha_gdm_dev {
+@@ -582,6 +582,9 @@
  	int nbq;
  
  	struct airoha_hw_stats stats;
@@ -333,7 +322,7 @@ index fa9a8edce22f..83daec003257 100644
  };
  
  struct airoha_gdm_port {
-@@ -562,8 +565,10 @@ struct airoha_gdm_port {
+@@ -589,8 +592,10 @@
  	int id;
  	int users;
  
@@ -346,14 +335,13 @@ index fa9a8edce22f..83daec003257 100644
  
  	struct metadata_dst *dsa_meta[AIROHA_MAX_DSA_PORTS];
  };
-diff --git a/drivers/net/ethernet/airoha/airoha_regs.h b/drivers/net/ethernet/airoha/airoha_regs.h
-index 442b48c9b991..4ea89057b560 100644
 --- a/drivers/net/ethernet/airoha/airoha_regs.h
 +++ b/drivers/net/ethernet/airoha/airoha_regs.h
 @@ -357,6 +357,18 @@
+ #define IP_ASSEMBLE_NBQ_MASK		GENMASK(20, 16)
  #define IP_FRAGMENT_PORT_MASK		GENMASK(8, 5)
  #define IP_FRAGMENT_NBQ_MASK		GENMASK(4, 0)
- 
++
 +#define REG_FE_GDM4_TMBI_FRAG		0x2028
 +#define GDM4_SGMII1_TX_WEIGHT_MASK	GENMASK(31, 26)
 +#define GDM4_SGMII1_TX_FRAG_SIZE_MASK	GENMASK(25, 16)
@@ -365,9 +353,6 @@ index 442b48c9b991..4ea89057b560 100644
 +#define GDM4_SGMII1_RX_FRAG_SIZE_MASK	GENMASK(25, 16)
 +#define GDM4_SGMII0_RX_WEIGHT_MASK	GENMASK(15, 10)
 +#define GDM4_SGMII0_RX_FRAG_SIZE_MASK	GENMASK(9, 0)
-+
+ 
  #define REG_MC_VLAN_EN			0x2100
  #define MC_VLAN_EN_MASK			BIT(0)
- 
--- 
-2.53.0

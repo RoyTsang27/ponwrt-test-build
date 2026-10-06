@@ -22,7 +22,7 @@ kernel driver patch stack have not received a complete memory-safety audit.
 | High | Missing APK signing secrets silently produce new per-build keys, while firmware releases have no stable signing-key contract. | Require stable APK and firmware keys, validate key pairing, load private keys after downloads and host-tool preparation, and remove working key files with an `always()` step. Build code remains within the signing trust boundary. |
 | Medium | Actions and release feeds follow mutable refs. The checkout retains credentials for later build steps. | Pin action commits and release feed commits, disable checkout credential persistence, and add Dependabot updates for actions. Development feeds continue to track upstream. |
 | Medium | Both device profiles omit the LuCI HTTPS collection and use regular stack protection and conservative fortification. | Select `luci-ssl-openssl`, strong userspace/kernel stack protection and FORTIFY level 2. Keep existing full RELRO and seccomp. |
-| Medium | Root-local information leaks and privileged process dumps assist exploit development or expose credentials after crashes. | Airoha-specific sysctls restrict kernel pointers, dmesg and unprivileged BPF, hide JIT symbols and disable privileged core dumps. Root administrators can override these for debugging. |
+| Medium | Root-local information leaks and privileged process dumps assist exploit development or expose credentials after crashes. | Airoha-specific sysctls restrict kernel pointers, dmesg and unprivileged BPF, hide JIT symbols and disable privileged core dumps. Diagnostic restrictions can be changed by administrators; re-enabling unprivileged BPF requires changing the policy and rebooting. |
 | Medium | Release tags are quoted but not constrained; a leading dash can be interpreted as a CLI option. An existing tag can identify a commit different from the firmware source. | Validate Git ref syntax and a conservative tag alphabet; only release the default branch; require a fresh tag and create it at the build SHA, then publish using `--verify-tag`. |
 | Reliability | Timestamp cache corruption aborts downloads; eviction keeps the oldest entries and can retain stale in-memory entries. | Ignore malformed cache lines, refresh in-memory state from the locked file and retain newest entries. Reject symlinked, non-regular or writable-by-others cache files. |
 | Reliability | The fork trails OpenWrt's current Airoha kernel patch level. | Update Linux 6.18.52 to 6.18.55 with upstream's source checksum, and add weekly draft update PRs plus AN7581/AN7583 kernel preparation checks. |
@@ -63,8 +63,9 @@ a separate TCP/MPTCP rebase, compilation and runtime testing.
   Source assertions verify one MediaTek phylink allocation, correct MT7628 MAC
   operations, one RTL8367SB entry, notifier removal before the RCU barrier,
   correct Airoha PHY shutdown placement and absence of the BBRv3 TCP hooks.
-- A new Ubuntu CI workflow resolves configurations and prepares kernels for both
-  SoCs. A complete firmware build and real-device tests are required before release.
+- A new Ubuntu CI workflow resolves configurations, prepares kernels and checks
+  the networking invariants in the patched source for both SoCs. A complete
+  firmware build and real-device tests are required before release.
 
 Local tests of signing orchestration do not establish cryptographic correctness
 of the external signing tools. The release workflow uses the actual host

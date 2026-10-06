@@ -7,12 +7,20 @@ on:
       - target/linux/airoha/**
       - .github/workflows/kernel-prepare.yml
       - feeds.conf.release
+      - configs/**
+      - config/**
+      - scripts/check-release.py
+      - scripts/check-kernel-patches.py
   pull_request:
     paths:
       - target/linux/generic/**
       - target/linux/airoha/**
       - .github/workflows/kernel-prepare.yml
       - feeds.conf.release
+      - configs/**
+      - config/**
+      - scripts/check-release.py
+      - scripts/check-kernel-patches.py
   workflow_dispatch:
   workflow_call:
     inputs:
@@ -22,6 +30,10 @@ on:
 
 permissions:
   contents: read
+
+concurrency:
+  group: kernel-prepare-${{ github.event.pull_request.head.repo.full_name || github.repository }}-${{ github.head_ref || inputs.ref || github.ref_name }}
+  cancel-in-progress: true
 
 jobs:
   prepare:
@@ -55,3 +67,5 @@ jobs:
           make defconfig
           python3 scripts/check-release.py --config .config
           make target/linux/prepare -j"$(nproc)" V=s
+          python3 scripts/check-kernel-patches.py \
+            build_dir/target-*/linux-airoha_"$TARGET"/linux-[0-9]*
