@@ -63,7 +63,7 @@ jobs:
 
   prepare:
     needs: update
-    if: needs.update.outputs.changed == 'true'
+    if: ${{ !cancelled() && needs.update.outputs.changed == 'true' }}
     uses: ./.github/workflows/kernel-prepare.yml
     with:
       ref: codex/kernel-${{ needs.update.outputs.version }}
