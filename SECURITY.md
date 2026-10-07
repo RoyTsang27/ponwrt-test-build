@@ -42,7 +42,7 @@ continue to follow upstream feed branches.
 
 The kernel tracking workflow runs weekly and can be dispatched manually. It
 proposes newer OpenWrt Airoha patch levels as draft PRs and runs the kernel
-preparation workflow on the proposed branch. It refuses downgrades, checksum
+compilation workflow on the proposed branch. It refuses downgrades, checksum
 changes without a version change, and a move to another kernel series. A series
 change requires rebasing the Airoha patch stack, including PON and offload
 support. Before merging any bump, build both targets and test them on hardware.

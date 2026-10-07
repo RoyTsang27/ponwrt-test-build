@@ -67,6 +67,12 @@ a separate TCP/MPTCP rebase, compilation and runtime testing.
   the networking invariants in the patched source for both SoCs. A complete
   firmware build and real-device tests are required before release.
 
+Follow-up, 2026-10-08: a kernel compilation failure was reported on Debian.
+Preparation checks cannot establish that C sources and modules compile. The
+two-target CI workflow now builds the host tools and cross compiler, then compiles
+the kernel and modules and retains diagnostics on failure. Compilation results
+are required before accepting future kernel updates.
+
 Local tests of signing orchestration do not establish cryptographic correctness
 of the external signing tools. The release workflow uses the actual host
 `fwtool`/`ucert` binaries to verify completed images and refuses publication on
