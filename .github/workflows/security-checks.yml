@@ -26,6 +26,13 @@ jobs:
           python3 scripts/check-release.py
           sh -n scripts/load-release-keys.sh
           bash -n scripts/verify-release.sh
+      - name: Build real signing tools and test signed images
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends cmake zstd
+          python3 scripts/build-signing-test-tools.py "$RUNNER_TEMP/signing-tools"
+          PONWRT_SIGNING_TOOLS="$RUNNER_TEMP/signing-tools/install/bin" \
+            python3 -m unittest discover -s tests -p test_signing_integration.py -v
       - name: Check workflows and shell scripts
         run: |
           go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12

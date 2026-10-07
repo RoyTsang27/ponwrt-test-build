@@ -19,6 +19,7 @@ kernel driver patch stack have not received a complete memory-safety audit.
 | High | `dl_github_archive.py` disables certificate verification. An intercepted API/archive request is accepted before the repacked source hash is checked. | Default verified TLS context, bounded request timeout, closed HTTP responses, strict SHA256 validation. |
 | High | Archive content is extracted before its repacked hash is checked, without validating archive paths and links. Predictable scratch paths also allow local interference. | Validate the complete member graph before invoking tar; reject traversal, absolute paths, symlink pivots/chains, duplicate members, device nodes and invalid hard links. Use a private temporary workspace and refuse unsafe scratch directories and cache files. Unusual archives fall back to the existing Git download path. |
 | High | APK builds enable `SIGN_FIRMWARE` but the certificate generation and firmware trust-key installation are inside the OPKG branch. The image recipe silently skips signing when those files are absent. The shipped profiles also omit `ucert`. | Generate firmware keys/certificates for both package formats, install the firmware trust anchor for APK, provide a signature-enforcement build option, and include `ucert` in releases. Fail the image recipes when signing material is absent or a signing command fails; verify every `.bin` and `.itb` sysupgrade artifact before upload. |
+| Reliability / security | The pinned `ucert -A` returns a boolean write result as its process status: successful appends report failure, while failed writes can report success. Buffered close errors are also ignored. | Convert append success to exit status zero and failures to nonzero, check `fclose`, retain fail-closed image signing, and identify the failing signing stage. Exercise the real pinned tools in CI. |
 | High | Missing APK signing secrets silently produce new per-build keys, while firmware releases have no stable signing-key contract. | Require stable APK and firmware keys, validate key pairing, load private keys after downloads and host-tool preparation, and remove working key files with an `always()` step. Build code remains within the signing trust boundary. |
 | Medium | Actions and release feeds follow mutable refs. The checkout retains credentials for later build steps. | Pin action commits and release feed commits, disable checkout credential persistence, and add Dependabot updates for actions. Development feeds continue to track upstream. |
 | Medium | Both device profiles omit the LuCI HTTPS collection and use regular stack protection and conservative fortification. | Select `luci-ssl-openssl`, strong userspace/kernel stack protection and FORTIFY level 2. Keep existing full RELRO and seccomp. |
@@ -79,6 +80,18 @@ Preparation checks cannot establish that C sources and modules compile. The
 two-target CI workflow now builds the host tools and cross compiler, then compiles
 the kernel and modules and retains diagnostics on failure. Compilation results
 are required before accepting future kernel updates.
+
+A subsequent local build at `daeeb6d475` compiled the kernel and created the
+firmware FIT, then failed at signing. The pinned upstream
+[`cert_append()`](https://github.com/openwrt/ucert/blob/57270b247c91f003db6e3ba1a71d6d1fa5710fef/ucert.c#L202)
+returned `write_file()`'s boolean directly as a process exit status. Successful
+writes therefore exited with status 1. The strengthened signing recipe exposed
+this bug; the initial substitute-tool tests missed it. The package patch corrects
+the status and checks errors when buffered writes are closed. Integration tests
+build the same SHA256-pinned json-c, libubox, usign, ucert and fwtool sources with
+their package patches, then exercise successful signing/verification, write and
+flush failures, truncated signatures and tampered firmware. Signing checks remain
+mandatory, and existing private keys and trust anchors are preserved.
 
 Local tests of signing orchestration do not establish cryptographic correctness
 of the external signing tools. The release workflow uses the actual host
