@@ -44,8 +44,6 @@ sudo apt install -y ack antlr3 asciidoc autoconf automake autopoint binutils bis
   python3-pyelftools qemu-utils re2c rsync scons squashfs-tools subversion swig texinfo uglifyjs \
   upx-ucl unzip vim wget xmlto xxd zlib1g-dev zstd
 
-#  或者使用ImmortalWrt一键脚本安装依赖
-sudo bash -c 'bash <(curl -s https://build-scripts.immortalwrt.org/init_build_environment.sh)'
 
 #  拉取源码
 git clone https://github.com/pbs05/ponwrt.git
@@ -68,6 +66,9 @@ make -j$(nproc)
 ```
 
 固件位于 `bin/targets/airoha/an7581/` 或 `bin/targets/airoha/an7583/`。
+
+签名发布与内核更新检查请参阅 [SECURITY.md](SECURITY.md)。
+发布流程固定 feeds 的提交版本，开发构建的 feeds 继续跟随上游。
 
 ## 刷入
 

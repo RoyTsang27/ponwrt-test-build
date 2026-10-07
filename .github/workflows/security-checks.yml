@@ -1,0 +1,32 @@
+name: Security regression checks
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-${{ github.event.pull_request.head.repo.full_name || github.repository }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Security regression tests
+        run: |
+          python3 -m unittest discover -s tests -v
+          python3 scripts/check-release.py
+          sh -n scripts/load-release-keys.sh
+          bash -n scripts/verify-release.sh
+      - name: Check workflows and shell scripts
+        run: |
+          go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
+          shellcheck scripts/load-release-keys.sh scripts/verify-release.sh

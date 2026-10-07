@@ -14,11 +14,15 @@ import hashlib
 import json
 import os
 import os.path
+import posixpath
 import re
 import shutil
 import ssl
+import stat
 import subprocess
 import sys
+import tarfile
+import tempfile
 import time
 import urllib.request
 
@@ -121,7 +125,66 @@ class Path(object):
 
         return subdir name if and only if there exists one, otherwise raise PathException
         """
-        args = ('tar', '-C', into, '-xzf', path, '--no-same-permissions')
+        # The repacked hash is checked only AFTER extraction. Validate the
+        # complete member graph before allowing tar to write anything.
+        with tarfile.open(path, 'r:gz') as archive:
+            members = archive.getmembers()
+        names = set()
+        links = set()
+        roots = set()
+        for member in members:
+            name = member.name.rstrip('/')
+            parts = name.split('/')
+            if (not name or name.startswith('/') or
+                    any(p in ('', '.', '..') for p in parts) or
+                    not (member.isdir() or member.isfile() or
+                         member.issym() or member.islnk())):
+                raise PathException('unsafe archive member: %s' % member.name)
+            if name in names:
+                raise PathException('duplicate archive member: %s' % name)
+            names.add(name)
+            roots.add(parts[0])
+            if member.issym():
+                links.add(name)
+        if len(roots) != 1:
+            raise PathException('archive must contain a single root directory')
+        root = roots.pop()
+        if not any(m.name.rstrip('/') == root and m.isdir() for m in members):
+            raise PathException('archive root must be a directory')
+        for member in members:
+            name = member.name.rstrip('/')
+            paths = [name]
+            if member.issym() or member.islnk():
+                target = member.linkname
+                if target.startswith('/'):
+                    raise PathException('absolute archive link: %s' % name)
+                if member.issym():
+                    target = posixpath.join(posixpath.dirname(name), target)
+                # Check the unresolved path too: normalizing link/../file
+                # before checking would hide traversal through "link".
+                prefix = ''
+                for part in target.split('/'):
+                    prefix = posixpath.normpath(posixpath.join(prefix, part))
+                    if prefix in links:
+                        raise PathException('archive link traverses symlink: %s' % name)
+                target = posixpath.normpath(target)
+                if target != root and not target.startswith(root + '/'):
+                    raise PathException('archive link escapes root: %s' % name)
+                # Reject link chains as well as extraction through a symlink.
+                # Unusual archives can fall back to the git download method.
+                paths.append(target)
+                if target in links:
+                    raise PathException('archive link chain: %s' % name)
+                if member.islnk() and not any(
+                        m.name.rstrip('/') == target and m.isfile() for m in members):
+                    raise PathException('invalid archive hard link: %s' % name)
+            for entry in paths:
+                parent = posixpath.dirname(entry)
+                while parent:
+                    if parent in links:
+                        raise PathException('archive path traverses symlink: %s' % name)
+                    parent = posixpath.dirname(parent)
+        args = ('tar', '-C', into, '-xzf', path, '--no-same-owner', '--no-same-permissions')
         subprocess.check_call(args, preexec_fn=lambda: os.umask(0o22))
         dirs = os.listdir(into)
         if len(dirs) == 1:
@@ -158,13 +221,17 @@ class GitHubCommitTsCache(object):
     __cachen = 2048
 
     def __init__(self):
-        Path.mkdir_all(TMPDIR_DL)
+        os.makedirs(TMPDIR_DL, mode=0o700, exist_ok=True)
+        info = os.lstat(TMPDIR_DL)
+        if (not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid() or
+                info.st_mode & 0o022):
+            raise DownloadGitHubError('Unsafe GitHub download scratch directory')
         self.cachef = os.path.join(TMPDIR_DL, self.__cachef)
         self.cache = {}
 
     def get(self, k):
         """Get timestamp with key ``k``."""
-        fileno = os.open(self.cachef, os.O_RDONLY | os.O_CREAT)
+        fileno = self._open(os.O_RDONLY)
         with os.fdopen(fileno) as fin:
             try:
                 fcntl.lockf(fileno, fcntl.LOCK_SH)
@@ -178,7 +245,7 @@ class GitHubCommitTsCache(object):
 
     def set(self, k, v):
         """Update timestamp with ``k``."""
-        fileno = os.open(self.cachef, os.O_RDWR | os.O_CREAT)
+        fileno = self._open(os.O_RDWR)
         with os.fdopen(fileno, 'w+') as f:
             try:
                 fcntl.lockf(fileno, fcntl.LOCK_EX)
@@ -188,15 +255,27 @@ class GitHubCommitTsCache(object):
             finally:
                 fcntl.lockf(fileno, fcntl.LOCK_UN)
 
+    def _open(self, flags):
+        fileno = os.open(self.cachef, flags | os.O_CREAT | os.O_NOFOLLOW | os.O_NONBLOCK, 0o600)
+        info = os.fstat(fileno)
+        if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid() or info.st_mode & 0o022:
+            os.close(fileno)
+            raise DownloadGitHubError('Unsafe GitHub timestamp cache file')
+        return fileno
+
     def _cache_init(self, fin):
+        self.cache = {}
         for line in fin:
-            k, ts, updated = line.split()
-            ts = int(ts)
-            updated = int(updated)
+            try:
+                k, ts, updated = line.split()
+                ts = int(ts)
+                updated = int(updated)
+            except ValueError:
+                continue
             self.cache[k] = (ts, updated)
 
     def _cache_flush(self, fout):
-        cache = sorted(self.cache.items(), key=lambda a: a[1][1])
+        cache = sorted(self.cache.items(), key=lambda a: a[1][1], reverse=True)
         cache = cache[:self.__cachen]
         self.cache = {}
         os.ftruncate(fout.fileno(), 0)
@@ -234,7 +313,7 @@ class DownloadGitHubTarball(object):
     clone-then-pack method
     """
 
-    __repo_url_regex = re.compile(r'^(?:https|git)://github.com/(?P<owner>[^/]+)/(?P<repo>[^/]+)')
+    __repo_url_regex = re.compile(r'^(?:https|git)://github\.com/(?P<owner>[A-Za-z0-9_.-]+)/(?P<repo>[A-Za-z0-9_.-]+)/?$')
 
     def __init__(self, args):
         self.dl_dir = args.dl_dir
@@ -243,6 +322,9 @@ class DownloadGitHubTarball(object):
         self.source = args.source
         self.submodules = args.submodules
         self.url = args.url
+        for value in (self.source, self.subdir):
+            if not value or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._+~-]*', value):
+                raise self._error('Source and subdir must be simple filenames')
         self._init_owner_repo()
         self.xhash = args.hash
         self._init_hasher()
@@ -255,13 +337,13 @@ class DownloadGitHubTarball(object):
         if self.submodules and self.submodules != ['skip']:
             raise self._error('Fetching submodules is not yet supported')
         self._init_commit_ts()
-        with Path(TMPDIR_DL, keep=True) as dir_dl:
+        with tempfile.TemporaryDirectory(prefix='github-', dir=TMPDIR_DL) as workdir:
             # fetch tarball from GitHub
-            tarball_path = os.path.join(dir_dl.path, self.subdir + '.tar.gz.dl')
+            tarball_path = os.path.join(workdir, self.subdir + '.tar.gz.dl')
             with Path(tarball_path, isdir=False):
                 self._fetch(tarball_path)
                 # unpack
-                d = os.path.join(dir_dl.path, self.subdir + '.untar')
+                d = os.path.join(workdir, self.subdir + '.untar')
                 with Path(d, preclean=True) as dir_untar:
                     tarball_prefix = Path.untar(tarball_path, into=dir_untar.path)
                     dir0 = os.path.join(dir_untar.path, tarball_prefix)
@@ -272,7 +354,7 @@ class DownloadGitHubTarball(object):
                     # rename subdir
                     os.rename(dir0, dir1)
                     # repack
-                    into=os.path.join(TMPDIR_DL, self.source)
+                    into=os.path.join(workdir, self.source)
                     Path.tar(dir_untar.path, self.subdir, into=into, ts=self.commit_ts)
                     try:
                         self._hash_check(into)
@@ -305,22 +387,21 @@ class DownloadGitHubTarball(object):
 
     def _init_hasher(self):
         xhash = self.xhash
-        if len(xhash) == 64:
+        if xhash and re.fullmatch(r'[0-9a-fA-F]{64}', xhash):
             self.hasher = hashlib.sha256()
-        elif len(xhash) == 32:
-            self.hasher = hashlib.md5()
         else:
             raise self._error('Requires sha256sum for verification')
-        self.xhash = xhash
+        self.xhash = xhash.lower()
 
     def _hash_check(self, f):
+        hasher = self.hasher.copy()
         with open(f, 'rb') as fin:
             while True:
                 d = fin.read(4096)
                 if not d:
                     break
-                self.hasher.update(d)
-        xhash = self.hasher.hexdigest()
+                hasher.update(d)
+        xhash = hasher.hexdigest()
         if xhash != self.xhash:
             raise self._error('Wrong hash (probably caused by .gitattributes), expecting {}, got {}'.format(self.xhash, xhash))
 
@@ -368,8 +449,8 @@ class DownloadGitHubTarball(object):
         raise self._error('Cannot fetch commit ts:{}'.format(reasons))
 
     def _init_commit_ts_remote_get(self, url, attrpath):
-        resp = self._make_request(url)
-        data = resp.read()
+        with self._make_request(url) as resp:
+            data = resp.read()
         date = json.loads(data)
         for attr in attrpath:
             date = date[attr]
@@ -382,8 +463,7 @@ class DownloadGitHubTarball(object):
         """Fetch tarball of the specified version ref."""
         ref = self.version
         url = self._make_repo_url_path('tarball', ref)
-        resp = self._make_request(url)
-        with open(path, 'wb') as fout:
+        with self._make_request(url) as resp, open(path, 'wb') as fout:
             while True:
                 d = resp.read(4096)
                 if not d:
@@ -404,8 +484,8 @@ class DownloadGitHubTarball(object):
             'User-Agent': 'OpenWrt',
         }
         req = urllib.request.Request(url, headers=headers)
-        sslcontext = ssl._create_unverified_context()
-        fileobj = urllib.request.urlopen(req, context=sslcontext)
+        sslcontext = ssl.create_default_context()
+        fileobj = urllib.request.urlopen(req, context=sslcontext, timeout=30)
         return fileobj
 
     def _error(self, msg):

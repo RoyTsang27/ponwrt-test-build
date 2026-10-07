@@ -21,7 +21,8 @@ PKG_LICENSE:=GPL-2.0
 
 # Extend depends from version.mk
 PKG_CONFIG_DEPENDS += \
-	CONFIG_SIGNED_PACKAGES CONFIG_TARGET_INIT_PATH CONFIG_TARGET_PREINIT_DISABLE_FAILSAFE \
+	CONFIG_SIGNED_PACKAGES CONFIG_SIGN_FIRMWARE CONFIG_REQUIRE_IMAGE_SIGNATURE \
+	CONFIG_TARGET_INIT_PATH CONFIG_TARGET_PREINIT_DISABLE_FAILSAFE \
 	CONFIG_NAND_SUPPORT \
 	CONFIG_LEGACY_SDCARD_SUPPORT \
 	CONFIG_EMMC_SUPPORT \
@@ -41,6 +42,7 @@ define Package/base-files
   CATEGORY:=Base system
   DEPENDS:= \
 	+netifd +libc +jsonfilter +SIGNED_PACKAGES:usign +SIGNED_PACKAGES:openwrt-keyring \
+	+SIGN_FIRMWARE:usign +REQUIRE_IMAGE_SIGNATURE:ucert \
 	+NAND_SUPPORT:ubi-utils +fstools +fwtool \
 	+SELINUX:procd-selinux +!SELINUX:procd +USE_SECCOMP:procd-seccomp \
 	+SELINUX:busybox-selinux +!SELINUX:busybox \
@@ -120,6 +122,30 @@ define Build/Compile/Default
 endef
 Build/Compile = $(Build/Compile/Default)
 
+ifneq ($(filter y,$(CONFIG_SIGN_FIRMWARE) $(if $(CONFIG_USE_APK),,$(CONFIG_SIGNED_PACKAGES))),)
+  define Build/Configure
+	umask 077; [ -s $(BUILD_KEY) -a -s $(BUILD_KEY).pub ] || \
+		$(STAGING_DIR_HOST)/bin/usign -G -s $(BUILD_KEY) -p $(BUILD_KEY).pub -c "Local build key"
+
+	umask 077; [ -s $(BUILD_KEY).ucert ] || \
+		$(STAGING_DIR_HOST)/bin/ucert -I -c $(BUILD_KEY).ucert -p $(BUILD_KEY).pub -s $(BUILD_KEY)
+  endef
+endif
+
+ifdef CONFIG_SIGN_FIRMWARE
+  define Package/base-files/install-firmware-key
+	mkdir -p $(1)/etc/opkg/keys
+	$(CP) $(BUILD_KEY).pub $(1)/etc/opkg/keys/`$(STAGING_DIR_HOST)/bin/usign -F -p $(BUILD_KEY).pub`
+  endef
+endif
+
+ifdef CONFIG_REQUIRE_IMAGE_SIGNATURE
+  define Package/base-files/install-signature-policy
+	mkdir -p $(1)/lib/upgrade
+	echo 'REQUIRE_IMAGE_SIGNATURE=1' > $(1)/lib/upgrade/require-signature.sh
+  endef
+endif
+
 ifneq ($(CONFIG_USE_APK),)
 ifndef CONFIG_BUILDBOT
   define Package/base-files/install-key
@@ -129,15 +155,6 @@ ifndef CONFIG_BUILDBOT
 endif
 else
 ifdef CONFIG_SIGNED_PACKAGES
-  define Build/Configure
-	[ -s $(BUILD_KEY) -a -s $(BUILD_KEY).pub ] || \
-		$(STAGING_DIR_HOST)/bin/usign -G -s $(BUILD_KEY) -p $(BUILD_KEY).pub -c "Local build key"
-
-	[ -s $(BUILD_KEY).ucert ] || \
-		$(STAGING_DIR_HOST)/bin/ucert -I -c $(BUILD_KEY).ucert -p $(BUILD_KEY).pub -s $(BUILD_KEY)
-
-  endef
-
 ifndef CONFIG_BUILDBOT
   define Package/base-files/install-key
 	mkdir -p $(1)/etc/opkg/keys
@@ -169,6 +186,8 @@ endif
 define Package/base-files/install
 	$(CP) ./files/* $(1)/
 	$(Package/base-files/install-key)
+	$(Package/base-files/install-firmware-key)
+	$(Package/base-files/install-signature-policy)
 	$(Package/base-files/nand-support)
 	$(Package/base-files/legacy-sdcard-support)
 	$(Package/base-files/emmc-support)

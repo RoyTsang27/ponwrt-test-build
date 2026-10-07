@@ -21,11 +21,31 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  validate:
+    name: Validate release request
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Check release policy
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          test "$GITHUB_REF" = "refs/heads/$DEFAULT_BRANCH"
+          python3 scripts/check-release.py --tag "$RELEASE_TAG"
+          existing_tag=$(git ls-remote origin "refs/tags/$RELEASE_TAG")
+          test -z "$existing_tag" || { echo 'Choose a new release tag'; exit 1; }
+          python3 -m unittest discover -s tests -v
+
   build:
     name: Build ${{ matrix.target }}
     runs-on: ubuntu-24.04
     timeout-minutes: 360
     environment: release
+    needs: validate
     strategy:
       fail-fast: false
       matrix:
@@ -34,7 +54,19 @@ jobs:
           - an7583
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Require configured release keys
+        env:
+          HAS_APK_KEY: ${{ secrets.PONWRT_APK_PRIVATE_KEY != '' }}
+          HAS_FIRMWARE_KEY: ${{ secrets.PONWRT_USIGN_PRIVATE_KEY != '' }}
+          HAS_FIRMWARE_PUBLIC_KEY: ${{ secrets.PONWRT_USIGN_PUBLIC_KEY != '' }}
+        run: |
+          test "$HAS_APK_KEY" = true
+          test "$HAS_FIRMWARE_KEY" = true
+          test "$HAS_FIRMWARE_PUBLIC_KEY" = true
 
       - name: Free build space
         run: |
@@ -58,27 +90,18 @@ jobs:
             uglifyjs unzip wget xmlto xxd zlib1g-dev zstd
 
       - name: Cache downloads
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: dl
-          key: ponwrt-dl-${{ matrix.target }}-${{ hashFiles('feeds.conf.default', 'configs/*.config') }}
+          key: ponwrt-dl-${{ matrix.target }}-${{ hashFiles('feeds.conf.release', 'configs/*.config') }}
           restore-keys: |
             ponwrt-dl-${{ matrix.target }}-
 
       - name: Install feeds
         run: |
+          cp feeds.conf.release feeds.conf
           ./scripts/feeds update -a
           ./scripts/feeds install -a
-
-      - name: Load repository signing key
-        env:
-          PONWRT_APK_PRIVATE_KEY: ${{ secrets.PONWRT_APK_PRIVATE_KEY }}
-        run: |
-          if [ -n "$PONWRT_APK_PRIVATE_KEY" ]; then
-            umask 077
-            printf '%s\n' "$PONWRT_APK_PRIVATE_KEY" > private-key.pem
-            openssl ec -in private-key.pem -pubout -out public-key.pem
-          fi
 
       - name: Configure ${{ matrix.target }}
         run: |
@@ -86,21 +109,47 @@ jobs:
             "configs/${{ matrix.target }}.config" \
             configs/release.config > .config
           make defconfig
+          python3 scripts/check-release.py --config .config
 
       - name: Download sources
         run: make download -j"$(nproc)"
 
+      - name: Prepare signing tools
+        run: |
+          make package/system/usign/host/compile package/system/ucert/host/compile \
+            package/system/fwtool/host/compile -j"$(nproc)"
+
+      - name: Load stable release signing keys
+        env:
+          PONWRT_APK_PRIVATE_KEY: ${{ secrets.PONWRT_APK_PRIVATE_KEY }}
+          PONWRT_USIGN_PRIVATE_KEY: ${{ secrets.PONWRT_USIGN_PRIVATE_KEY }}
+          PONWRT_USIGN_PUBLIC_KEY: ${{ secrets.PONWRT_USIGN_PUBLIC_KEY }}
+        run: sh scripts/load-release-keys.sh
+
       - name: Build ${{ matrix.target }}
         run: make -j"$(nproc)"
 
+      - name: Verify signed images
+        env:
+          TARGET: ${{ matrix.target }}
+        run: bash scripts/verify-release.sh "bin/targets/airoha/$TARGET"
+
+      - name: Remove signing keys
+        if: always()
+        run: rm -f private-key.pem public-key.pem key-build key-build.pub key-build.ucert
+
       - name: Pack ${{ matrix.target }}
+        env:
+          TARGET: ${{ matrix.target }}
         run: |
           mkdir release
-          tar --zstd -cf "release/ponwrt-${{ matrix.target }}.tar.zst" \
-            -C bin/targets/airoha "${{ matrix.target }}"
+          cp feeds.conf.release "bin/targets/airoha/$TARGET/feeds.conf.release"
+          printf '%s\n' "$GITHUB_SHA" > "bin/targets/airoha/$TARGET/source-commit.txt"
+          tar --zstd -cf "release/ponwrt-$TARGET.tar.zst" \
+            -C bin/targets/airoha "$TARGET"
 
       - name: Upload ${{ matrix.target }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: ponwrt-${{ matrix.target }}
           path: release/*.tar.zst
@@ -111,12 +160,14 @@ jobs:
     name: Create release
     needs: build
     runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment: release
     permissions:
       contents: write
 
     steps:
       - name: Download firmware archives
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           pattern: ponwrt-*
           path: release
@@ -124,7 +175,7 @@ jobs:
 
       - name: Create checksums
         working-directory: release
-        run: sha256sum *.tar.zst > sha256sums
+        run: sha256sum -- *.tar.zst > sha256sums
 
       - name: Create GitHub release
         env:
@@ -132,12 +183,16 @@ jobs:
           RELEASE_TAG: ${{ inputs.tag }}
           PRERELEASE: ${{ inputs.prerelease }}
         run: |
+          # Creating a fresh ref fails if another run/user already created it.
+          gh api "repos/$GITHUB_REPOSITORY/git/refs" \
+            -f "ref=refs/tags/$RELEASE_TAG" -f "sha=$GITHUB_SHA" > /dev/null
           args=(
             "$RELEASE_TAG"
             release/*.tar.zst
             release/sha256sums
             --repo "$GITHUB_REPOSITORY"
             --target "$GITHUB_SHA"
+            --verify-tag
             --title "PonWrt $RELEASE_TAG"
             --generate-notes
           )
