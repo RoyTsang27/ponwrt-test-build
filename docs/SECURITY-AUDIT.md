@@ -25,7 +25,8 @@ kernel driver patch stack have not received a complete memory-safety audit.
 | Medium | Root-local information leaks and privileged process dumps assist exploit development or expose credentials after crashes. | Airoha-specific sysctls restrict kernel pointers, dmesg and unprivileged BPF, hide JIT symbols and disable privileged core dumps. Diagnostic restrictions can be changed by administrators; re-enabling unprivileged BPF requires changing the policy and rebooting. |
 | Medium | Release tags are quoted but not constrained; a leading dash can be interpreted as a CLI option. An existing tag can identify a commit different from the firmware source. | Validate Git ref syntax and a conservative tag alphabet; only release the default branch; require a fresh tag and create it at the build SHA, then publish using `--verify-tag`. |
 | Reliability | Timestamp cache corruption aborts downloads; eviction keeps the oldest entries and can retain stale in-memory entries. | Ignore malformed cache lines, refresh in-memory state from the locked file and retain newest entries. Reject symlinked, non-regular or writable-by-others cache files. |
-| Reliability | The fork trails OpenWrt's current Airoha kernel patch level. | Update Linux 6.18.52 to 6.18.55 with upstream's source checksum, and add weekly draft update PRs plus AN7581/AN7583 kernel preparation checks. |
+| Reliability | The fork trails OpenWrt's current Airoha kernel patch level. | Update Linux 6.18.52 to 6.18.55 with upstream's source checksum, and add weekly draft update PRs plus AN7581/AN7583 kernel compilation checks. |
+| Reliability | The old 8250 `UPIO_AU` patch overlaps a new stable-kernel case, so it applies without rejects but compilation fails with a duplicate case value. | Remove the redundant patch, retain the stable-kernel handling, and require exactly one `UPIO_AU` case in the prepared source. |
 | Reliability | An Airoha phylink hunk has stale, ambiguous context and can apply to the MAC-address setter instead of device shutdown. | Anchor the hunk to `airoha_dev_stop` and refresh the downstream shutdown patch context; verify the resulting functions after applying the full stack. |
 | Medium | Both READMEs recommend piping an unpinned network script into a root shell. | Remove that shortcut; retain the explicit package-manager dependency installation instructions. |
 
@@ -37,7 +38,7 @@ The kernel bump was taken from OpenWrt commit
 [`7670f36e38fce4105f96b6fdc07350ea65ac8dca`](https://github.com/openwrt/openwrt/commit/7670f36e38fce4105f96b6fdc07350ea65ac8dca).
 The updater reads the Airoha target and kernel version/checksum from one immutable
 upstream commit. It accepts only the expected numeric version and hash fields.
-Draft proposals never merge themselves. Nine backports already present in Linux
+Draft proposals never merge themselves. Ten backports already present in Linux
 6.18.55 were removed. The netfilter, MediaTek and Airoha patch contexts were
 refreshed while preserving stable-tree fixes, including the netfilter RCU
 barrier and the MT7628 MAC operations selection.
@@ -58,7 +59,7 @@ a separate TCP/MPTCP rebase, compilation and runtime testing.
   and the signature policy. The signing executables are test substitutes here.
 - `actionlint` 1.7.12 validates all workflows; shell syntax checks and
   `git diff --check` pass. CI also runs ShellCheck.
-- The official Linux 6.18.55 archive matches the upstream SHA256. All 611 active
+- The official Linux 6.18.55 archive matches the upstream SHA256. The original 611 active
   generic/Airoha patches apply to a freshly extracted source tree with no rejects.
   Source assertions verify one MediaTek phylink allocation, correct MT7628 MAC
   operations, one RTL8367SB entry, notifier removal before the RCU barrier,
@@ -67,7 +68,13 @@ a separate TCP/MPTCP rebase, compilation and runtime testing.
   the networking invariants in the patched source for both SoCs. A complete
   firmware build and real-device tests are required before release.
 
-Follow-up, 2026-10-08: a kernel compilation failure was reported on Debian.
+Follow-up, 2026-10-08: compilation reproduced a duplicate `case UPIO_AU` in
+`drivers/tty/serial/8250/8250_port.c` on both Airoha targets. Linux 6.18.55 already
+handles this case, while the downstream `890-serial-8250` patch added it again
+under `CONFIG_HAS_IOPORT`. Removing that redundant patch leaves 610 active
+generic/Airoha patches and preserves the upstream UART handling. A source check
+now rejects a missing or duplicate case. Fresh compilation must validate this fix.
+
 Preparation checks cannot establish that C sources and modules compile. The
 two-target CI workflow now builds the host tools and cross compiler, then compiles
 the kernel and modules and retains diagnostics on failure. Compilation results

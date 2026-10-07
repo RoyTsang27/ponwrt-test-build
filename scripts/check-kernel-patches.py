@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check known networking invariants in a prepared Airoha kernel tree."""
+"""Check known patch-stack invariants in a prepared Airoha kernel tree."""
 import argparse
 from pathlib import Path
 
@@ -17,7 +17,11 @@ def check(kernel):
     exit_flow = function((kernel / 'net/netfilter/nf_flow_table_core.c').read_text(),
                          'static void __exit nf_flow_table_module_exit(')
     realtek = (kernel / 'drivers/net/dsa/realtek/rtl8365mb_main.c').read_text()
+    serial = function((kernel / 'drivers/tty/serial/8250/8250_port.c').read_text(),
+                      'static void set_io_from_upio(')
     conditions = (
+        (serial.count('case UPIO_AU:') == 1,
+         '8250 serial I/O selection must have exactly one UPIO_AU case'),
         (add_mac.count('phylink = phylink_create(') == 1,
          'MediaTek must allocate phylink exactly once'),
         ('mac_ops = &rt5350_phylink_ops;' in add_mac and 'phy_mode, mac_ops);' in add_mac,
@@ -35,7 +39,7 @@ def check(kernel):
     for valid, message in conditions:
         if not valid:
             raise ValueError(message)
-    print('Prepared kernel networking checks passed: ' + str(kernel))
+    print('Prepared kernel patch checks passed: ' + str(kernel))
 
 
 def main():
