@@ -16,3 +16,9 @@ When updating, compare both upstream trees against `upstream.json`, preserve
 local security changes, update the recorded commits and package releases, and
 run the security checks and both Airoha kernel/PON package builds. Never add
 these repositories back as feeds alongside these built-in packages.
+
+Existing PON feed symlinks are ignored by the package scanner, so an older
+checkout cannot override these copies. For housekeeping, run `./scripts/feeds
+uninstall -a` followed by the normal feed update/install steps after switching
+to this branch. Use the new `feeds.conf.release` or `feeds.conf.default`; a
+previously copied `feeds.conf` may still list the removed external PON feeds.

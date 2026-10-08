@@ -181,6 +181,22 @@ ubiupdatevol() { cp "$2" "$1"; }
 
 
 class DefaultPonTests(unittest.TestCase):
+    def test_stale_feed_links_cannot_override_audited_packages(self):
+        awk = shutil.which('gawk')
+        if not awk:
+            self.skipTest('GNU awk is required')
+        with tempfile.TemporaryDirectory() as directory:
+            override = Path(directory) / 'overrides'
+            result = subprocess.run([awk, '-v', 'of=' + str(override), '-f',
+                                     str(ROOT / 'include/scan.awk')],
+                                    input='pon/userspace/airoha-ponctl\nfeeds/pon_userspace/airoha-ponctl\n'
+                                          'system/ordinary\nfeeds/custom/ordinary\n',
+                                    text=True, capture_output=True, check=True)
+            self.assertIn('pon/userspace/airoha-ponctl', result.stdout.splitlines())
+            self.assertNotIn('feeds/pon_userspace/airoha-ponctl', result.stdout.splitlines())
+            self.assertIn('feeds/custom/ordinary', result.stdout.splitlines())
+            self.assertEqual(override.read_text().splitlines(), ['system/ordinary'])
+
     def test_sensitive_bundle_requires_write_permission(self):
         acl = json.loads((PON / 'userspace/luci-app-pon/root/usr/share/rpcd/acl.d/luci-app-pon.json').read_text())['luci-app-pon']
         bundle = '/tmp/ponwrt/debug/pon-debug.tar.gz'

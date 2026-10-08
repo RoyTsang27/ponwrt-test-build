@@ -29,7 +29,7 @@ jobs:
       - name: Build real signing tools and test signed images
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends cmake zstd
+          sudo apt-get install -y --no-install-recommends cmake zstd gawk
           python3 scripts/build-signing-test-tools.py "$RUNNER_TEMP/signing-tools"
           PONWRT_SIGNING_TOOLS="$RUNNER_TEMP/signing-tools/install/bin" \
             python3 -m unittest discover -s tests -p test_signing_integration.py -v

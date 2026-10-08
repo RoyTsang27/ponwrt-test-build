@@ -6,6 +6,7 @@ on:
       - target/linux/generic/**
       - target/linux/airoha/**
       - package/pon/**
+      - include/scan.awk
       - .github/workflows/kernel-prepare.yml
       - feeds.conf.release
       - configs/**
@@ -17,6 +18,7 @@ on:
       - target/linux/generic/**
       - target/linux/airoha/**
       - package/pon/**
+      - include/scan.awk
       - .github/workflows/kernel-prepare.yml
       - feeds.conf.release
       - configs/**
@@ -66,6 +68,11 @@ jobs:
           cp feeds.conf.release feeds.conf
           ./scripts/feeds update -a
           ./scripts/feeds install -a
+          # Check target defaults independently of the saved device profiles.
+          printf 'CONFIG_TARGET_airoha=y\nCONFIG_TARGET_airoha_%s=y\n' "$TARGET" > .config
+          cat configs/release.config >> .config
+          make defconfig
+          python3 scripts/check-release.py --config .config
           ./scripts/kconfig.pl + "configs/$TARGET.config" configs/release.config > .config
           make defconfig
           python3 scripts/check-release.py --config .config
