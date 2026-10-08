@@ -29,12 +29,21 @@ jobs:
       - name: Build real signing tools and test signed images
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends cmake zstd gawk
+          sudo apt-get install -y --no-install-recommends cmake zstd gawk busybox
           python3 scripts/build-signing-test-tools.py "$RUNNER_TEMP/signing-tools"
           PONWRT_SIGNING_TOOLS="$RUNNER_TEMP/signing-tools/install/bin" \
             python3 -m unittest discover -s tests -p test_signing_integration.py -v
       - name: PON file safety tests with real Linux ownership checks
         run: sudo python3 -m unittest discover -s tests -p test_pon_security.py -v
+      - name: PON helper tests with BusyBox ash and applets
+        run: |
+          mkdir "$RUNNER_TEMP/pon-busybox"
+          for command in mkdir mktemp mv head cp wc cmp rm rmdir; do
+            ln -s "$(command -v busybox)" "$RUNNER_TEMP/pon-busybox/$command"
+          done
+          # stat comes from the explicit coreutils-stat dependency.
+          sudo env PON_TEST_SHELL='busybox ash' PATH="$RUNNER_TEMP/pon-busybox:$PATH" \
+            python3 tests/test_pon_security.py BoardUploadTests RuntimeDirectoryTests -v
       - name: Compile and test PON userspace and check dependency advisories
         run: |
           rustup toolchain install 1.90.0 --profile minimal

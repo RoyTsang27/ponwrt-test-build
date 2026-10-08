@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 import re
 import shutil
+import shlex
 import subprocess
 import sys
 import tempfile
@@ -13,6 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 PON = ROOT / 'package/pon'
 SECURE = PON / 'userspace/airoha-ponctl/files/pon-secure.sh'
 DATA = PON / 'userspace/luci-app-pon/root/usr/libexec/airoha-pon-data'
+SHELL = shlex.split(os.environ.get('PON_TEST_SHELL', 'sh'))
 
 
 class OmciLengthTests(unittest.TestCase):
@@ -78,7 +80,7 @@ class RuntimeDirectoryTests(unittest.TestCase):
     def run_library(self, directory, command):
         source = SECURE.read_text().replace('PON_RUNTIME_DIR=/tmp/ponwrt',
                                            "PON_RUNTIME_DIR='" + str(directory) + "'")
-        return subprocess.run(['sh', '-c', source + '\n' + command], capture_output=True)
+        return subprocess.run([*SHELL, '-c', source + '\n' + command], capture_output=True)
 
     def test_rejects_symlink_without_changing_its_target(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -125,7 +127,7 @@ ubiupdatevol() { cp "$2" "$1"; }
         self.flash.write_bytes(b'original')
 
     def run_helper(self, *args):
-        return subprocess.run(['sh', str(self.script), *args], capture_output=True,
+        return subprocess.run([*SHELL, str(self.script), *args], capture_output=True,
                               env={**os.environ, 'FAKE_FLASH': str(self.flash)})
 
     def prepare(self):
