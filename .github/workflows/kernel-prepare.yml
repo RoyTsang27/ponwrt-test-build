@@ -5,6 +5,7 @@ on:
     paths:
       - target/linux/generic/**
       - target/linux/airoha/**
+      - package/pon/**
       - .github/workflows/kernel-prepare.yml
       - feeds.conf.release
       - configs/**
@@ -15,6 +16,7 @@ on:
     paths:
       - target/linux/generic/**
       - target/linux/airoha/**
+      - package/pon/**
       - .github/workflows/kernel-prepare.yml
       - feeds.conf.release
       - configs/**
@@ -79,6 +81,17 @@ jobs:
         run: |
           set -o pipefail
           make target/linux/compile -j"$(nproc)" V=s 2>&1 | tee kernel-build.log
+      - name: Compile integrated PON drivers and userspace packages
+        run: |
+          set -o pipefail
+          make -j"$(nproc)" V=s \
+            package/pon/drivers/airoha-pon-frontends/compile \
+            package/pon/drivers/airoha-xpon/compile \
+            package/pon/userspace/airoha-ponctl/compile \
+            package/pon/userspace/airoha-pon-daemons/compile \
+            package/pon/userspace/airoha-pon-debug/compile \
+            package/pon/userspace/luci-app-pon/compile \
+            package/pon/userspace/luci-app-iptv/compile 2>&1 | tee pon-build.log
       - name: Upload build diagnostics
         if: failure()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

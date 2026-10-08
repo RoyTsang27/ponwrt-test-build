@@ -80,3 +80,7 @@ Release workflows use pinned feeds; development feeds continue to follow upstrea
 Use [AN758x-Stock2UBI](https://github.com/pbs05/an758x-stock2ubi) to back up the stock flash and install the UBI layout. Boot images and Web recovery are provided by [AN758x U-Boot](https://github.com/pbs05/uboot-an758x).
 
 After installing PonWrt, restore the stock calibration and identity data through U-Boot Web or **Network → PON → Configuration → PON board data** in LuCI. Convert FiberHome `factory` backups with [FiberHome Factory](https://github.com/pbs05/fiberhome-factory) first. Restore converted FiberHome data, `reservearea`, or `dsd` backups to the PonWrt `factory` volume. Nokia `bosa` and `ri` backups use volumes with the same names.
+
+The PON driver and userspace repositories are maintained as built-in, default
+packages for AN7581 and AN7583. See [PON integration](package/pon/README.md) and
+[the PON security audit](docs/PON-SECURITY-AUDIT.md) for provenance and fixes.

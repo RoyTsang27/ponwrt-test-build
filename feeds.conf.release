@@ -4,5 +4,3 @@ src-git luci https://github.com/immortalwrt/luci.git^5fc1fac5684cac6eee2c7fbff78
 src-git routing https://github.com/openwrt/routing.git^4b9891b9136259f93294a424507ed24c5e8c1cbd
 src-git telephony https://github.com/openwrt/telephony.git^5d68d53c160a325ea9d03fce393e051573bcc736
 src-git video https://github.com/openwrt/video.git^afb0a7453e4ecebe4b59f9c1b5f8d5413fb652f2
-src-git pon_drivers https://github.com/pbs05/openwrt-pon-drivers.git^e5194d2dfd169eef8f4a944fdc3f929e0287b680
-src-git pon_userspace https://github.com/pbs05/openwrt-pon-userspace.git^cce9d756742487b378749c606b30e13ee9b0f093

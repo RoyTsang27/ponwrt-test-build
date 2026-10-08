@@ -27,6 +27,11 @@ def check_config(path):
     settings = set(Path(path).read_text().splitlines())
     missing = [option for option in REQUIRED_OPTIONS
                if 'CONFIG_' + option + '=y' not in settings]
+    if settings.intersection({'CONFIG_TARGET_airoha_an7581=y', 'CONFIG_TARGET_airoha_an7583=y'}):
+        missing += ['PACKAGE_' + package for package in (
+            'kmod-airoha-xpon', 'kmod-airoha-pon-frontend', 'airoha-ponctl',
+            'airoha-pond', 'airoha-pon-debug', 'luci-app-pon', 'luci-app-iptv',
+        ) if 'CONFIG_PACKAGE_' + package + '=y' not in settings]
     if missing:
         raise ValueError('Missing release security settings: ' + ', '.join(missing))
 
