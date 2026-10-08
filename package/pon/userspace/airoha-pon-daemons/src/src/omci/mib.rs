@@ -8,7 +8,7 @@ use super::protocol::{
     ACTION_GET_ALL_ALARMS, ACTION_GET_ALL_ALARMS_NEXT, ACTION_GET_CURRENT_DATA, ACTION_GET_NEXT,
     ACTION_MIB_RESET, ACTION_MIB_UPLOAD, ACTION_MIB_UPLOAD_NEXT, ACTION_SET, ACTION_SET_TABLE,
     ACTION_SYNCHRONIZE_TIME, RESULT_ATTRIBUTE_FAILED, RESULT_COMMAND_NOT_SUPPORTED,
-    RESULT_INSTANCE_EXISTS, RESULT_PARAMETER_ERROR, RESULT_SUCCESS, RESULT_UNKNOWN_INSTANCE,
+    RESULT_INSTANCE_EXISTS, RESULT_PARAMETER_ERROR, RESULT_PROCESSING_ERROR, RESULT_SUCCESS, RESULT_UNKNOWN_INSTANCE,
     RESULT_UNKNOWN_ME,
 };
 use super::provisioning::{
@@ -47,6 +47,11 @@ const TOTAL_PRIORITY_QUEUE_COUNT: u16 =
     UPSTREAM_PRIORITY_QUEUE_COUNT + DOWNSTREAM_PRIORITY_QUEUE_COUNT;
 const TOTAL_GEM_PORT_COUNT: u16 = 256;
 const VEIP_ENTITY: u16 = 0x0a01;
+
+// Bound OLT-controlled allocation while leaving ample room for provisioning.
+const MAX_MANAGED_ENTITIES: usize = 4096;
+const MAX_TABLE_ROWS: usize = 4096;
+const MAX_TOTAL_TABLE_ROWS: usize = 16384;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct AttributeValueChange {
@@ -558,6 +563,13 @@ impl Mib {
             };
             return Response::new(request, result);
         }
+        let additional = 1 + usize::from(
+            request.class_id == CLASS_MAC_BRIDGE_PORT_CONFIG_DATA
+                && !self.entities.contains_key(&(CLASS_MAC_BRIDGE_PORT_FILTER_PREASSIGN_DATA, request.entity_id)),
+        );
+        if self.entities.len() + additional > MAX_MANAGED_ENTITIES {
+            return Response::new(request, RESULT_PROCESSING_ERROR);
+        }
         self.insert(request.class_id, request.entity_id, entity);
         if request.class_id == CLASS_MAC_BRIDGE_PORT_CONFIG_DATA {
             /* Creating Class 47 also creates the same Class 79 entity used by the following filter policy Set. */
@@ -629,7 +641,10 @@ impl Mib {
             return self.entity_error(request);
         }
         self.rebuild_upload_snapshot();
-        Response::mib_upload(request, self.upload_snapshot.len() as u16)
+        match u16::try_from(self.upload_snapshot.len()) {
+            Ok(count) => Response::mib_upload(request, count),
+            Err(_) => Response::new(request, RESULT_PROCESSING_ERROR),
+        }
     }
 
     fn handle_get_all_alarms(&self, request: &Request<'_>) -> Response {
@@ -751,7 +766,13 @@ impl Mib {
             .expect("capacity was checked before response construction")
     }
 
+    fn total_table_rows(&self) -> usize {
+        self.entities.values().flat_map(|entity| entity.attributes.values())
+            .map(|attribute| attribute.table_rows.len()).sum()
+    }
+
     fn handle_set(&mut self, request: &Request<'_>) -> Response {
+        let total_rows = self.total_table_rows();
         let class_known = self.known_classes.contains(&request.class_id);
         let Some(entity) = self
             .entities
@@ -791,6 +812,18 @@ impl Mib {
             let end = cursor + length;
             if end > request.content.len() {
                 return Response::new(request, RESULT_PARAMETER_ERROR);
+            }
+            if attribute.table_row_len.is_some() && request.class_id != CLASS_ENHANCED_SECURITY_CONTROL {
+                let row = &request.content[cursor..end];
+                if row.len() < 8 {
+                    return Response::new(request, RESULT_PARAMETER_ERROR);
+                }
+                if !row[8..].iter().all(|byte| *byte == 0xff)
+                    && !attribute.table_rows.contains_key(&row[..8])
+                    && (attribute.table_rows.len() >= MAX_TABLE_ROWS || total_rows >= MAX_TOTAL_TABLE_ROWS)
+                {
+                    return Response::new(request, RESULT_PROCESSING_ERROR);
+                }
             }
             updates.push((
                 index,
@@ -1043,6 +1076,7 @@ impl Mib {
     }
 
     fn handle_set_table(&mut self, request: &Request<'_>) -> Response {
+        let total_rows = self.total_table_rows();
         let class_known = self.known_classes.contains(&request.class_id);
         let Some(entity) = self
             .entities
@@ -1076,15 +1110,22 @@ impl Mib {
             return Response::new(request, RESULT_PARAMETER_ERROR);
         }
 
-        // Set-table applies rows in wire order using each table's add/delete control field.
+        // Stage the bounded packet so resource failure cannot partially apply a batch.
+        let mut rows = attribute.table_rows.clone();
         for row in request.content.chunks_exact(row_len) {
             let key = row[..8].to_vec();
             if row[8..].iter().all(|byte| *byte == 0xff) {
-                attribute.table_rows.remove(&key);
+                rows.remove(&key);
             } else {
-                attribute.table_rows.insert(key, row.to_vec());
+                rows.insert(key, row.to_vec());
             }
         }
+        if rows.len() > MAX_TABLE_ROWS
+            || total_rows - attribute.table_rows.len() + rows.len() > MAX_TOTAL_TABLE_ROWS
+        {
+            return Response::new(request, RESULT_PROCESSING_ERROR);
+        }
+        attribute.table_rows = rows;
         self.increment_mib_sync();
         Response::set_success(request)
     }
@@ -2054,4 +2095,108 @@ mod tests {
         assert_eq!(mib.dispatch(&set).result(), Some(RESULT_SUCCESS));
         assert_eq!(mib.entities[&filter].attributes[&1].value, value);
     }
+
+    #[test]
+    fn create_budget_keeps_duplicate_requests_and_delete_recovery_working() {
+        let mut mib = empty_mib();
+        mib.dynamic_classes.insert(CLASS_ETHERNET_PM_HISTORY_DATA);
+        let payload = [0x12, 0x34];
+        let request = Request {
+            encoding: super::super::protocol::Encoding::Baseline,
+            tci: 1, message_type: 0x44, action: ACTION_CREATE,
+            class_id: CLASS_ETHERNET_PM_HISTORY_DATA, entity_id: 1,
+            attribute_mask: 0, payload: &payload, content: &payload,
+        };
+        assert_eq!(mib.handle_create(&request).result(), Some(RESULT_SUCCESS));
+        for id in 0..MAX_MANAGED_ENTITIES - 1 {
+            mib.entities.insert((65000, id as u16), ManagedEntity::default());
+        }
+        assert_eq!(mib.handle_create(&request).result(), Some(RESULT_SUCCESS));
+        let next = Request { entity_id: 2, ..request };
+        assert_eq!(mib.handle_create(&next).result(), Some(RESULT_PROCESSING_ERROR));
+        assert_eq!(mib.entities.len(), MAX_MANAGED_ENTITIES);
+        assert_eq!(mib.handle_delete(&request).result(), Some(RESULT_SUCCESS));
+        assert_eq!(mib.handle_create(&next).result(), Some(RESULT_SUCCESS));
+    }
+
+    #[test]
+    fn create_budget_accounts_for_the_implicit_bridge_filter_entity() {
+        let mut mib = empty_mib();
+        mib.dynamic_classes.insert(CLASS_MAC_BRIDGE_PORT_CONFIG_DATA);
+        for id in 0..MAX_MANAGED_ENTITIES - 1 {
+            mib.entities.insert((65000, id as u16), ManagedEntity::default());
+        }
+        let payload = [0; 32];
+        let request = Request {
+            encoding: super::super::protocol::Encoding::Baseline,
+            tci: 1, message_type: 0x44, action: ACTION_CREATE,
+            class_id: CLASS_MAC_BRIDGE_PORT_CONFIG_DATA, entity_id: 1,
+            attribute_mask: 0, payload: &payload, content: &payload,
+        };
+        assert_eq!(mib.handle_create(&request).result(), Some(RESULT_PROCESSING_ERROR));
+        assert_eq!(mib.entities.len(), MAX_MANAGED_ENTITIES - 1);
+        assert!(!mib.entities.contains_key(&(CLASS_MAC_BRIDGE_PORT_FILTER_PREASSIGN_DATA, 1)));
+    }
+
+    fn table_mib(count: usize) -> Mib {
+        let mut mib = empty_mib();
+        for id in 0..count {
+            let mut entity = ManagedEntity::default().table(6, 16);
+            for index in 0..MAX_TABLE_ROWS {
+                let mut row = vec![0; 16];
+                row[..8].copy_from_slice(&(index as u64).to_be_bytes());
+                entity.attributes.get_mut(&6).unwrap().table_rows.insert(row[..8].to_vec(), row);
+            }
+            mib.insert(CLASS_EXTENDED_VLAN_TAGGING, id as u16, entity);
+        }
+        mib
+    }
+
+    #[test]
+    fn table_budgets_allow_replacement_and_atomic_delete_then_add() {
+        let mut mib = table_mib(1);
+        let mut row = [0; 16];
+        row[..8].copy_from_slice(&99999u64.to_be_bytes());
+        let mut request = Request {
+            encoding: super::super::protocol::Encoding::Extended,
+            tci: 1, message_type: 0x48, action: ACTION_SET,
+            class_id: CLASS_EXTENDED_VLAN_TAGGING, entity_id: 0,
+            attribute_mask: attribute_bit(6).unwrap(), payload: &row, content: &row,
+        };
+        assert_eq!(mib.handle_set(&request).result(), Some(RESULT_PROCESSING_ERROR));
+        let replacement = [0; 16];
+        request.content = &replacement;
+        assert_eq!(mib.handle_set(&request).result(), Some(RESULT_SUCCESS));
+        request.content = &row;
+        assert_eq!(mib.handle_set_table(&request).result(), Some(RESULT_PROCESSING_ERROR));
+        assert_eq!(mib.entities[&(CLASS_EXTENDED_VLAN_TAGGING, 0)].attributes[&6].table_rows.len(), MAX_TABLE_ROWS);
+        let mut batch = [0; 32];
+        batch[8..16].fill(0xff);
+        batch[16..].copy_from_slice(&row);
+        request.content = &batch;
+        assert_eq!(mib.handle_set_table(&request).result(), Some(RESULT_SUCCESS));
+        let rows = &mib.entities[&(CLASS_EXTENDED_VLAN_TAGGING, 0)].attributes[&6].table_rows;
+        assert_eq!(rows.len(), MAX_TABLE_ROWS);
+        assert!(!rows.contains_key(&replacement[..8]));
+        assert!(rows.contains_key(&row[..8]));
+    }
+
+    #[test]
+    fn aggregate_table_budget_rejects_growth_without_partial_changes() {
+        let mut mib = table_mib(MAX_TOTAL_TABLE_ROWS / MAX_TABLE_ROWS);
+        let key = (CLASS_EXTENDED_VLAN_TAGGING, 5);
+        mib.insert(key.0, key.1, ManagedEntity::default().table(6, 16));
+        let mut batch = [0; 32];
+        batch[16..24].copy_from_slice(&1u64.to_be_bytes());
+        let request = Request {
+            encoding: super::super::protocol::Encoding::Extended,
+            tci: 1, message_type: 0x48, action: ACTION_SET,
+            class_id: key.0, entity_id: key.1,
+            attribute_mask: attribute_bit(6).unwrap(), payload: &batch, content: &batch,
+        };
+        assert_eq!(mib.handle_set(&request).result(), Some(RESULT_PROCESSING_ERROR));
+        assert_eq!(mib.handle_set_table(&request).result(), Some(RESULT_PROCESSING_ERROR));
+        assert!(mib.entities[&key].attributes[&6].table_rows.is_empty());
+    }
+
 }

@@ -13,7 +13,9 @@ and prevent feed updates from discarding the fixes.
 Both supported Airoha subtargets select the core stack, diagnostics and LuCI
 PON/IPTV apps by default. Optical modules and calibration remain board-specific.
 Packet capture and IPTV remain disabled in their shipped runtime configuration.
-Release validation also requires the resolved core package selections.
+Release validation also requires the resolved core package selections. The
+package scanner prevents stale external PON feed links from overriding the
+audited built-in sources.
 
 The review covered OMCI/OAM framing, authentication, kernel control attributes,
 netlink authorization, firmware loading, frontend lifetimes, Rust parsing and
@@ -31,6 +33,7 @@ the EN7572 firmware blobs or test live optical hardware.
 | A read-only LuCI PON role can read the diagnostic archive. | Archives may contain registration credentials, raw packets and configuration. Restrict the archive path to the write role while retaining ordinary status access. |
 | Enhanced-security authentication compares tags with ordinary slice equality. | Replace the potentially early-exiting comparison with `subtle::ConstantTimeEq`. This reduces timing leakage; an exploitable timing attack was not demonstrated. |
 | Control sockets read unlimited request lines and serve clients serially without a timeout. | A local client can consume memory or stall status handling. Limit requests to 128 bytes with a two-second whole-request deadline and bounded response writes; reject incomplete/invalid input. Refuse to delete regular files or symlinks at the configured socket path. Control socket permissions remain 0600. |
+| OMCI Create/Set/Set-table can grow entity and table maps without an allocation budget. | An OLT can exhaust daemon memory by repeatedly adding unique instances or rows. Cap entities at 4096, rows per table at 4096 and aggregate rows at 16384; preserve replacement/deletion/retry behavior, reject exhausted budgets with Processing Error, and stage batches atomically. Check MIB-upload record counts before narrowing to 16 bits. |
 | Raw packet descriptors lack close-on-exec. | Set `SOCK_CLOEXEC` when opening the daemon packet socket to avoid accidental inheritance by future child processes. |
 
 The fixed authentication PSK in upstream class 332 is preserved for protocol
@@ -54,7 +57,10 @@ claim that the firmware or kernel is free of CVEs.
 Regression coverage exercises all 65536 declared OMCI content lengths against
 the actual C normalizer, valid baseline/extended frames, symlink and ownership
 attacks, unique uploads, private backups, flash readback using a fake storage
-file, constant-time tag matching and bounded Unix-socket requests. Linux CI runs
+file, constant-time tag matching bounded Unix-socket requests and MIB resource exhaustion/recovery. Linux CI runs
 ownership tests as root; no test writes router flash. It also runs the existing
 Rust suites and cross-compiles integrated packages with Linux 6.18.55 on AN7581
-and AN7583. Build and test results will be recorded after CI completes.
+and AN7583. Initial Linux security checks passed: 37 daemon tests, 2 control-utility tests,
+8 PON filesystem/length/access tests, 44 existing security tests and 5 real
+signing tests. Both cargo-audit scans found no applicable vulnerabilities.
+The final resource-budget tests and cross-build results will be recorded after CI completes.
