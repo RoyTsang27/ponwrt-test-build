@@ -9,8 +9,9 @@ Reviewed release automation, download and cache handling, APK/firmware signing,
 sysupgrade verification, supplied AN7581/AN7583 configurations, service defaults,
 and the Airoha upgrade/initialization path. This is a focused source audit, not
 a claim that the complete OpenWrt tree or every external dependency is secure.
-The separately fetched PON feeds, proprietary firmware blobs, and the entire
-kernel driver patch stack have not received a complete memory-safety audit.
+The later [PON audit](PON-SECURITY-AUDIT.md) expands this review to the integrated
+PON sources. Proprietary firmware blobs and the entire kernel driver patch stack
+have not received a complete memory-safety audit.
 
 ## Findings and patches
 
@@ -74,7 +75,8 @@ Follow-up, 2026-10-08: compilation reproduced a duplicate `case UPIO_AU` in
 handles this case, while the downstream `890-serial-8250` patch added it again
 under `CONFIG_HAS_IOPORT`. Removing that redundant patch leaves 610 active
 generic/Airoha patches and preserves the upstream UART handling. A source check
-now rejects a missing or duplicate case. Fresh compilation must validate this fix.
+now rejects a missing or duplicate case. Both AN7581 and AN7583 kernel/module compilations passed in
+[run 37699870443](https://github.com/RoyTsang27/ponwrt-test-build/actions/runs/37699870443).
 
 Preparation checks cannot establish that C sources and modules compile. The
 two-target CI workflow now builds the host tools and cross compiler, then compiles
@@ -120,3 +122,7 @@ failure. No production signing secrets were created or changed by this audit.
 The workflow hardening follows
 [GitHub's secure-use guidance](https://docs.github.com/en/actions/reference/security/secure-use),
 including immutable action refs and minimum token permissions.
+
+Real signing-tool integration tests passed in [run 37703413883](https://github.com/RoyTsang27/ponwrt-test-build/actions/runs/37703413883).
+The separately fetched PON feeds have since been integrated and audited; see
+[the PON audit](PON-SECURITY-AUDIT.md) for the expanded scope and results.

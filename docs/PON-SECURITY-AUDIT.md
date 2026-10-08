@@ -5,7 +5,10 @@
 Reviewed `pbs05/openwrt-pon-userspace` at
 `cce9d756742487b378749c606b30e13ee9b0f093` and
 `pbs05/openwrt-pon-drivers` at
-`e5194d2dfd169eef8f4a944fdc3f929e0287b680`. The reviewed copies and local fixes
+`e5194d2dfd169eef8f4a944fdc3f929e0287b680`. Standalone patches apply to those exact upstream commits:
+[userspace](patches/pon-userspace-security.patch) and
+[drivers](patches/pon-drivers-security.patch). They have been checked with
+`git apply --check`. The reviewed copies and local fixes
 are part of `package/pon`, with original licenses and provenance retained.
 The external PON feed entries were removed to avoid duplicate package names
 and prevent feed updates from discarding the fixes.

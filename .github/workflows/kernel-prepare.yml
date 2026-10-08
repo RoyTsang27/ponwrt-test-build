@@ -72,7 +72,7 @@ jobs:
           printf 'CONFIG_TARGET_airoha=y\nCONFIG_TARGET_airoha_%s=y\n' "$TARGET" > .config
           cat configs/release.config >> .config
           make defconfig
-          python3 scripts/check-release.py --config .config
+          python3 scripts/check-release.py --pon-config .config
           ./scripts/kconfig.pl + "configs/$TARGET.config" configs/release.config > .config
           make defconfig
           python3 scripts/check-release.py --config .config

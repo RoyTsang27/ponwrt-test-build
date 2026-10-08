@@ -12,6 +12,23 @@ REQUIRED_OPTIONS = (
     'KERNEL_CC_STACKPROTECTOR_STRONG', 'PKG_FORTIFY_SOURCE_2', 'PKG_RELRO_FULL',
     'USE_SECCOMP', 'JSON_CYCLONEDX_SBOM',
 )
+PON_PACKAGES = (
+    'kmod-airoha-xpon', 'kmod-airoha-pon-frontend', 'airoha-ponctl',
+    'airoha-pond', 'airoha-pon-debug', 'luci-app-pon', 'luci-app-iptv',
+)
+
+
+def missing_pon_packages(settings):
+    if settings.intersection({'CONFIG_TARGET_airoha_an7581=y', 'CONFIG_TARGET_airoha_an7583=y'}):
+        return ['PACKAGE_' + package for package in PON_PACKAGES
+                if 'CONFIG_PACKAGE_' + package + '=y' not in settings]
+    return []
+
+
+def check_pon_config(path):
+    missing = missing_pon_packages(set(Path(path).read_text().splitlines()))
+    if missing:
+        raise ValueError('Missing core PON packages: ' + ', '.join(missing))
 
 
 def check_tag(tag):
@@ -27,11 +44,7 @@ def check_config(path):
     settings = set(Path(path).read_text().splitlines())
     missing = [option for option in REQUIRED_OPTIONS
                if 'CONFIG_' + option + '=y' not in settings]
-    if settings.intersection({'CONFIG_TARGET_airoha_an7581=y', 'CONFIG_TARGET_airoha_an7583=y'}):
-        missing += ['PACKAGE_' + package for package in (
-            'kmod-airoha-xpon', 'kmod-airoha-pon-frontend', 'airoha-ponctl',
-            'airoha-pond', 'airoha-pon-debug', 'luci-app-pon', 'luci-app-iptv',
-        ) if 'CONFIG_PACKAGE_' + package + '=y' not in settings]
+    missing += missing_pon_packages(settings)
     if missing:
         raise ValueError('Missing release security settings: ' + ', '.join(missing))
 
@@ -62,6 +75,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--tag')
     parser.add_argument('--config')
+    parser.add_argument('--pon-config', help='Check PON selections independently of release hardening')
     parser.add_argument('--feeds', default='feeds.conf.release')
     args = parser.parse_args()
     try:
@@ -70,6 +84,8 @@ def main():
         check_feeds(args.feeds)
         if args.config:
             check_config(args.config)
+        if args.pon_config:
+            check_pon_config(args.pon_config)
     except ValueError as error:
         parser.exit(1, str(error) + '\n')
 
