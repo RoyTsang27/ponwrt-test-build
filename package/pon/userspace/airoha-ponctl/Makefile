@@ -4,7 +4,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=airoha-ponctl
 PKG_VERSION:=0.2.0
-PKG_RELEASE:=2
+PKG_RELEASE:=3
 PKG_URL:=https://github.com/pbs05/openwrt-pon-userspace/tree/main/airoha-ponctl
 
 PKG_LICENSE:=GPL-2.0-only
@@ -19,7 +19,7 @@ define Package/airoha-ponctl
   CATEGORY:=Network
   SUBMENU:=PON
   TITLE:=Airoha PON control utility
-  DEPENDS:=$(RUST_ARCH_DEPENDS) +kmod-airoha-xpon
+  DEPENDS:=$(RUST_ARCH_DEPENDS) +kmod-airoha-xpon +coreutils-stat
 endef
 
 define Package/airoha-ponctl/description

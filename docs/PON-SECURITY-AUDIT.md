@@ -16,6 +16,8 @@ and prevent feed updates from discarding the fixes.
 Both supported Airoha subtargets select the core stack, diagnostics and LuCI
 PON/IPTV apps by default. Optical modules and calibration remain board-specific.
 Packet capture and IPTV remain disabled in their shipped runtime configuration.
+The control package explicitly depends on `coreutils-stat` because the shipped
+BusyBox profiles omit the stat applet used by the runtime ownership checks.
 Release validation also requires the resolved core package selections. The
 package scanner prevents stale external PON feed links from overriding the
 audited built-in sources.
@@ -50,7 +52,7 @@ netlink, sysfs and network configuration backend.
 
 Checked the locked Rust dependency names against the official RustSec advisory
 database snapshot `550efd3d587a29b2e2c2b21b17a440da4fede999`.
-The one matching package advisory, `RUSTSEC-2020-0146` / `CVE-2020-36465`, affects
+The one matching package advisory, [RUSTSEC-2020-0146 / CVE-2020-36465](https://rustsec.org/advisories/RUSTSEC-2020-0146.html), affects
 older generic-array releases; the locked 0.14.7 version is in its patched range
 (`>= 0.13.3`). No applicable assigned CVE was confirmed by that check. The new
 code findings above have no assigned CVE IDs. CI runs cargo-audit 0.22.2 against
@@ -63,7 +65,34 @@ attacks, unique uploads, private backups, flash readback using a fake storage
 file, constant-time tag matching bounded Unix-socket requests and MIB resource exhaustion/recovery. Linux CI runs
 ownership tests as root; no test writes router flash. It also runs the existing
 Rust suites and cross-compiles integrated packages with Linux 6.18.55 on AN7581
-and AN7583. Initial Linux security checks passed: 37 daemon tests, 2 control-utility tests,
-8 PON filesystem/length/access tests, 44 existing security tests and 5 real
-signing tests. Both cargo-audit scans found no applicable vulnerabilities.
-The final resource-budget tests and cross-build results will be recorded after CI completes.
+and AN7583. Final Linux security checks passed in
+[run 37812990875](https://github.com/RoyTsang27/ponwrt-test-build/actions/runs/37812990875):
+41 daemon tests, 2 control-utility tests, 9 PON filesystem/length/access/feed
+checks, 44 existing security tests and 5 real signing tests. Both cargo-audit
+scans found no applicable vulnerabilities. Cross-build results will be recorded
+after CI completes.
+
+The branch still matches OpenWrt Airoha Linux 6.18.55 at upstream commit
+`8d0fa6b2903f1abe57c6dc3320e75a18d353b880`, checked on 2026-10-09.
+
+## Updating an existing checkout
+
+Switch to `codex/signing-append-fix` and pull its current commits. Replace any
+old `feeds.conf` with the checked-in `feeds.conf.release`, then update and install
+feeds normally. The package scanner ignores stale PON feed links automatically;
+`./scripts/feeds uninstall -a` before reinstalling feeds also removes the obsolete
+package links, while keeping the downloaded feed sources.
+
+Fresh target configurations select the seven core packages automatically. The
+supplied `configs/an7581.config` and `configs/an7583.config` explicitly select
+them too. Existing custom `.config` files may retain explicit deselections:
+select `kmod-airoha-xpon`, `kmod-airoha-pon-frontend`, `airoha-ponctl`,
+`airoha-pond`, `airoha-pon-debug`, `luci-app-pon` and `luci-app-iptv`, run
+`make defconfig`,
+and check `python3 scripts/check-release.py --pon-config .config` before building.
+This preserves the remaining custom device and package selections.
+
+Recovery backups on this branch are private files named
+`/tmp/ponwrt/board/backup-*`, rather than the old paths in the preserved upstream
+identity documentation. The flash helpers print the exact recovery path after a
+successful update. No test in this review writes physical router flash.
