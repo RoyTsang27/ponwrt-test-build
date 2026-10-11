@@ -54,6 +54,14 @@ replaces kernel/rootfs/rootfs_data while preserving the other volumes; the raw
 bootloader and environment partitions are outside that operation. PON, LAN,
 USB and LEDs inherit the existing MD board support.
 
+The missing-volume guard checks the name returned by OpenWrt's UBI lookup,
+because an unsuccessful search can still return status zero. This also fixes
+the existing AN7581 and AN7583 UBI profiles. Regression tests reproduce that
+helper behavior and verify that missing required volumes stop the upgrade before
+any flash writes.
+The tcboot device tree compiles with all PON references resolved and adds no
+compiler warnings relative to the existing MD UBI profile.
+
 Use production signing keys for production builds. CI-generated keys are test
 keys. Source and image checks do not establish bootloader compatibility with
 every tcboot variant or replace hardware validation.

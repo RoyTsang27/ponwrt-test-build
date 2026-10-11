@@ -13,7 +13,7 @@ airoha_require_ubi_layout()
 	}
 
 	for volume in fip ubootenv ubootenv2 "$@"; do
-		if ! nand_find_volume "$ubidev" "$volume" >/dev/null; then
+		if [ -z "$(nand_find_volume "$ubidev" "$volume")" ]; then
 			echo "UBI base volume $volume is missing; repair the layout from U-Boot recovery."
 			return 1
 		fi

@@ -26,17 +26,19 @@ class TcbootUpgradeTests(unittest.TestCase):
                 entry.size = 4
                 archive.addfile(entry, io.BytesIO(b'test'))
 
-    def run_platform(self, command, missing=''):
+    def run_platform(self, command, missing='', platform=PLATFORM):
         mocks = r'''
 board_name() { echo nokia,xg-040g-md-tcboot; }
 nand_do_platform_check() { echo "checked:$1"; }
-nand_find_ubi() { [ "$MISSING" = ubi ] && return 1; echo ubi0; }
-nand_find_volume() { [ "$MISSING" = "$2" ] && return 1; echo ubi0_1; }
+# Match the OpenWrt helpers: an unsuccessful search may return status 0
+# while producing no output. Callers must check the returned device name.
+nand_find_ubi() { [ "$MISSING" = ubi ] && return 0; echo ubi0; }
+nand_find_volume() { [ "$MISSING" = "$2" ] && return 0; echo ubi0_1; }
 nand_do_upgrade() { echo "upgraded:$CI_UBIPART:$CI_KERNPART:$CI_SKIP_KERNEL_MTD"; }
 fit_do_upgrade() { echo 'unexpected FIT upgrade'; return 1; }
 fw_setenv() { echo 'unexpected environment write'; return 1; }
 '''
-        return subprocess.run(['sh', '-c', PLATFORM.read_text() + '\n' + mocks + '\n'
+        return subprocess.run(['sh', '-c', platform.read_text() + '\n' + mocks + '\n'
                                'MISSING="$2"\n' + command, 'test', str(self.image), missing],
                               text=True, capture_output=True)
 
@@ -67,6 +69,17 @@ fw_setenv() { echo 'unexpected environment write'; return 1; }
                 self.assertNotEqual(result.returncode, 0)
                 self.assertNotIn('upgraded:', result.stdout)
                 self.assertNotIn('environment write', result.stdout)
+
+    def test_missing_existing_ubi_base_volume_is_detected(self):
+        for target in ('an7581', 'an7583'):
+            platform = ROOT / 'target/linux/airoha' / target / 'base-files/lib/upgrade/platform.sh'
+            for missing in ('fip', 'ubootenv', 'ubootenv2', 'factory', 'bosa', 'ri'):
+                with self.subTest(target=target, missing=missing):
+                    result = self.run_platform('airoha_require_ubi_layout factory bosa ri',
+                                               missing, platform)
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn('UBI base volume ' + missing + ' is missing', result.stdout)
+                    self.assertEqual(result.stderr, '')
 
 
 if __name__ == '__main__':

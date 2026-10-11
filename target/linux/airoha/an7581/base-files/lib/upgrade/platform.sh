@@ -12,7 +12,7 @@ airoha_require_tcboot_layout()
 		return 1
 	}
 	for volume in bosa ri; do
-		nand_find_volume "$ubidev" "$volume" >/dev/null || {
+		[ -n "$(nand_find_volume "$ubidev" "$volume")" ] || {
 			echo "PON volume $volume is missing; restore its stock backup before upgrading."
 			return 1
 		}
@@ -30,7 +30,7 @@ airoha_require_ubi_layout()
 	}
 
 	for volume in fip ubootenv ubootenv2 "$@"; do
-		if ! nand_find_volume "$ubidev" "$volume" >/dev/null; then
+		if [ -z "$(nand_find_volume "$ubidev" "$volume")" ]; then
 			echo "UBI base volume $volume is missing; repair the layout from U-Boot recovery."
 			return 1
 		fi
