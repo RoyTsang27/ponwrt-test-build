@@ -419,6 +419,31 @@ define Device/nokia_xg-040g-md-ubi-usb-sfp
 endef
 TARGET_DEVICES += nokia_xg-040g-md-ubi-usb-sfp
 
+define Build/nokia-tcboot-pon-placeholders
+  head -c 262144 /dev/zero | tr '\000' '\377' > $(KDIR)/nokia-tcboot-empty-pon-data.bin
+endef
+
+define Device/nokia_xg-040g-md-tcboot
+  $(call Device/nokia_xg-040g-md-common)
+  DEVICE_VARIANT := (tcboot)
+  DEVICE_DTS := an7581-nokia_xg-040g-md-tcboot
+  SOC := an7581
+  KERNEL_LOADADDR := 0x80088000
+  KERNEL_SIZE := 8192k
+  IMAGE_SIZE := 261120k
+  KERNEL_IN_UBI := 1
+  UBINIZE_OPTS += -s 2048
+  # Reserve personal-data volumes before rootfs_data consumes the free space.
+  UBINIZE_PARTS_AFTER := bosa=:$(KDIR)/nokia-tcboot-empty-pon-data.bin \
+    ri=:$(KDIR)/nokia-tcboot-empty-pon-data.bin
+  IMAGES := factory.bin sysupgrade.bin
+  IMAGE/factory.bin := append-kernel | pad-to $$$$(KERNEL_SIZE) | \
+    nokia-tcboot-pon-placeholders | append-ubi | check-size
+  IMAGE/sysupgrade.bin := sysupgrade-tar | append-metadata | check-size
+  DEVICE_PACKAGES += nand-utils ubi-utils
+endef
+TARGET_DEVICES += nokia_xg-040g-md-tcboot
+
 define Device/quantum_q1000k-ubi
   DEVICE_VENDOR := Quantum Fiber
   DEVICE_MODEL := Q1000K

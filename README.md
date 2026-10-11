@@ -22,6 +22,7 @@ The authors and contributors are not responsible for device damage, network serv
 | AN7581 | FiberHome HG5585F CT | `fiberhome_hg5585f-ct` | `factory` |
 | AN7581 | FiberHome HG5585F CU | `fiberhome_hg5585f-cu` | `factory` |
 | AN7581 | Gemtek XG2010G | `gemtek_xg2010g` | `dsd` |
+| AN7581 | Nokia XG-040G-MD tcboot | `nokia_xg-040g-md-tcboot` | `bosa`, `ri` (UBI volumes) |
 | AN7581 | Nokia XG-040G-MD UBI | `nokia_xg-040g-md-ubi` | `bosa`, `ri` |
 | AN7581 | Nokia XG-040G-TF UBI | `nokia_xg-040g-tf-ubi` | `bosa`, `ri` |
 | AN7581 | UnionMan UNG00A | `unionman_ung00a` | `reservearea` |
@@ -84,3 +85,7 @@ After installing PonWrt, restore the stock calibration and identity data through
 The PON driver and userspace repositories are maintained as built-in, default
 packages for AN7581 and AN7583. See [PON integration](package/pon/README.md) and
 [the PON security audit](docs/PON-SECURITY-AUDIT.md) for provenance and fixes.
+
+Linux 6.18.56 and the XG-040G-MD tcboot profile are documented in
+[the kernel update](docs/KERNEL-6.18.56.md) and
+[the tcboot build guide](docs/XG-040G-MD-TCBOOT.md).
