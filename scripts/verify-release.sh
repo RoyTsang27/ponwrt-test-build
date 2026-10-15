@@ -2,6 +2,8 @@
 # Verify every sysupgrade image before making it a release artifact.
 set -euo pipefail
 target_dir=${1:?Supply the target output directory}
+# ucert also invokes usign by name, outside OpenWrt make's tool environment.
+export PATH="$(pwd)/staging_dir/host/bin:$PATH"
 verify_dir=$(mktemp -d "${RUNNER_TEMP:-/tmp}/ponwrt-verify.XXXXXX")
 trap 'rm -rf "$verify_dir"' EXIT HUP INT TERM
 mkdir "$verify_dir/keys"

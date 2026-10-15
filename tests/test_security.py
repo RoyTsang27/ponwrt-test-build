@@ -293,7 +293,7 @@ case "$2" in
   *) exit 1 ;;
 esac
 ''',
-                'ucert': '#!/bin/sh\ngrep -q "^signed$"\n',
+                'ucert': '#!/bin/sh\nusign -F >/dev/null || exit 1\ngrep -q "^signed$"\n',
             }
             for name, source in scripts.items():
                 (tools / name).write_text(source)
@@ -303,7 +303,7 @@ esac
             for name, data in images.items():
                 (work / 'images' / name).write_text(data)
             return subprocess.run(['bash', str(ROOT / 'scripts/verify-release.sh'), 'images'],
-                                  cwd=temp, capture_output=True)
+                                  cwd=temp, env=dict(os.environ, PATH=os.defpath), capture_output=True)
 
     def test_all_bin_and_itb_images_are_checked(self):
         result = self.verify_images({'first device-sysupgrade.itb': 'signed\n',

@@ -75,12 +75,14 @@ class SigningIntegrationTests(unittest.TestCase):
         (self.work / 'staging_dir/host').mkdir(parents=True)
         (self.work / 'staging_dir/host/bin').symlink_to(self.tools, target_is_directory=True)
         command = ['bash', str(ROOT / 'scripts/verify-release.sh'), 'images']
-        verified = subprocess.run(command, cwd=self.work, env=self.env, capture_output=True)
+        # A fresh CI step does not inherit OpenWrt make's host-tool PATH.
+        verify_env = dict(self.env, PATH=os.defpath)
+        verified = subprocess.run(command, cwd=self.work, env=verify_env, capture_output=True)
         self.assertEqual(verified.returncode, 0, verified.stderr.decode(errors='replace'))
         self.assertIn(b'Verified 2 signed', verified.stdout)
         with (self.work / targets[1]).open('r+b') as stream:
             stream.write(b'TAMPERED')
-        tampered = subprocess.run(command, cwd=self.work, env=self.env, capture_output=True)
+        tampered = subprocess.run(command, cwd=self.work, env=verify_env, capture_output=True)
         self.assertNotEqual(tampered.returncode, 0)
 
 
