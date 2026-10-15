@@ -86,6 +86,6 @@ The PON driver and userspace repositories are maintained as built-in, default
 packages for AN7581 and AN7583. See [PON integration](package/pon/README.md) and
 [the PON security audit](docs/PON-SECURITY-AUDIT.md) for provenance and fixes.
 
-Linux 6.18.56 and the XG-040G-MD tcboot profile are documented in
-[the kernel update](docs/KERNEL-6.18.56.md) and
+Linux 6.18.57 and the XG-040G-MD tcboot profile are documented in
+[the kernel comparison](docs/KERNEL-6.18.57.md) and
 [the tcboot build guide](docs/XG-040G-MD-TCBOOT.md).
