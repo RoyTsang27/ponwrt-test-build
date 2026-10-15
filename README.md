@@ -22,6 +22,7 @@ The authors and contributors are not responsible for device damage, network serv
 | AN7581 | FiberHome HG5585F CT | `fiberhome_hg5585f-ct` | `factory` |
 | AN7581 | FiberHome HG5585F CU | `fiberhome_hg5585f-cu` | `factory` |
 | AN7581 | Gemtek XG2010G | `gemtek_xg2010g` | `dsd` |
+| AN7581 | Nokia XG-040G-MD tcboot | `nokia_xg-040g-md-tcboot` | `bosa`, `ri` (UBI volumes) |
 | AN7581 | Nokia XG-040G-MD UBI | `nokia_xg-040g-md-ubi` | `bosa`, `ri` |
 | AN7581 | Nokia XG-040G-TF UBI | `nokia_xg-040g-tf-ubi` | `bosa`, `ri` |
 | AN7581 | UnionMan UNG00A | `unionman_ung00a` | `reservearea` |
@@ -45,8 +46,6 @@ sudo apt install -y ack antlr3 asciidoc autoconf automake autopoint binutils bis
   python3-pyelftools qemu-utils re2c rsync scons squashfs-tools subversion swig texinfo uglifyjs \
   upx-ucl unzip vim wget xmlto xxd zlib1g-dev zstd
 
-#  Or use the ImmortalWrt one-click script to install dependencies
-sudo bash -c 'bash <(curl -s https://build-scripts.immortalwrt.org/init_build_environment.sh)'
 
 
 #  Clone the source code
@@ -74,8 +73,19 @@ make -j$(nproc)
 
 Images are written to `bin/targets/airoha/an7581/` or `bin/targets/airoha/an7583/`.
 
+For signed releases and kernel update checks, see [SECURITY.md](SECURITY.md).
+Release workflows use pinned feeds; development feeds continue to follow upstream.
+
 ## Install
 
 Use [AN758x-Stock2UBI](https://github.com/pbs05/an758x-stock2ubi) to back up the stock flash and install the UBI layout. Boot images and Web recovery are provided by [AN758x U-Boot](https://github.com/pbs05/uboot-an758x).
 
 After installing PonWrt, restore the stock calibration and identity data through U-Boot Web or **Network → PON → Configuration → PON board data** in LuCI. Convert FiberHome `factory` backups with [FiberHome Factory](https://github.com/pbs05/fiberhome-factory) first. Restore converted FiberHome data, `reservearea`, or `dsd` backups to the PonWrt `factory` volume. Nokia `bosa` and `ri` backups use volumes with the same names.
+
+The PON driver and userspace repositories are maintained as built-in, default
+packages for AN7581 and AN7583. See [PON integration](package/pon/README.md) and
+[the PON security audit](docs/PON-SECURITY-AUDIT.md) for provenance and fixes.
+
+Linux 6.18.57 and the XG-040G-MD tcboot profile are documented in
+[the kernel comparison](docs/KERNEL-6.18.57.md) and
+[the tcboot build guide](docs/XG-040G-MD-TCBOOT.md).

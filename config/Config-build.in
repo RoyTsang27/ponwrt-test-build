@@ -92,6 +92,15 @@ menu "Global build settings"
 		  their authenticity before flashing. OpenWrt's build infrastructure
 		  signs images with temporary keys; disabling this drops the signature.
 
+	config REQUIRE_IMAGE_SIGNATURE
+		bool "Require trusted signatures during sysupgrade"
+		depends on SIGN_FIRMWARE
+		select PACKAGE_ucert
+		help
+		  Reject unsigned images and images signed by an untrusted key.
+		  Use a stable firmware signing key for release builds. Local builds
+		  with different keys require an explicit sysupgrade force override.
+
 	comment "General build options"
 
 	config TESTING_KERNEL
