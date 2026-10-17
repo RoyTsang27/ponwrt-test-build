@@ -73,6 +73,26 @@ make -j$(nproc)
 
 Images are written to `bin/targets/airoha/an7581/` or `bin/targets/airoha/an7583/`.
 
+When building LLVM locally, Clang compilation is limited to two concurrent jobs
+using [LLVM's Ninja job pool](https://llvm.org/docs/CMake.html#frequently-used-llvm-related-variables),
+independently of the firmware's `make -j` setting. Set
+`LLVM_BPF_COMPILE_JOBS=1` on the make command line when configuring a new LLVM
+build on a host with less memory. This limits concurrency; sufficient RAM for
+each compiler process is still required.
+
+If `tools/llvm-bpf` fails with `Killed signal terminated program cc1plus`, a host
+or container memory limit is a likely cause. Confirm with the host's kernel/OOM
+logs. Resume with fewer jobs, keeping completed objects:
+
+```sh
+make tools/llvm-bpf/compile -j1 V=s
+make -j2 V=s
+```
+
+There is no need to run `make clean` for this failure. More RAM, swap (where
+permitted), or a higher container memory limit may be necessary if one compiler
+process still cannot fit.
+
 For signed releases and kernel update checks, see [SECURITY.md](SECURITY.md).
 Release workflows use pinned feeds; development feeds continue to follow upstream.
 

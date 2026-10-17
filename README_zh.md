@@ -67,6 +67,23 @@ make -j$(nproc)
 
 固件位于 `bin/targets/airoha/an7581/` 或 `bin/targets/airoha/an7583/`。
 
+本地编译 LLVM 时，通过 [LLVM 的 Ninja 作业池](https://llvm.org/docs/CMake.html#frequently-used-llvm-related-variables)
+将 Clang 编译并发限制为两个任务，独立于固件的 `make -j` 设置。内存较少的
+主机在配置新的 LLVM 构建时，可以在 make 命令行指定
+`LLVM_BPF_COMPILE_JOBS=1`。此设置只限制并发，每个编译进程仍需要足够的内存。
+
+如果 `tools/llvm-bpf` 出现 `Killed signal terminated program cc1plus`，
+通常是主机或容器触及内存限制，请通过主机的内核/OOM 日志确认。
+可以降低并发继续编译，保留已完成的目标文件：
+
+```sh
+make tools/llvm-bpf/compile -j1 V=s
+make -j2 V=s
+```
+
+此类失败无需执行 `make clean`。如果单个编译进程仍无法运行，需要增加内存、
+在允许时增加 swap，或提高容器的内存限制。
+
 签名发布与内核更新检查请参阅 [SECURITY.md](SECURITY.md)。
 发布流程固定 feeds 的提交版本，开发构建的 feeds 继续跟随上游。
 
