@@ -120,7 +120,7 @@ Signed-off-by: Lorenzo Bianconi <lorenzo@kernel.org>
  
  	if (!airoha_is_lan_gdm_dev(dev) &&
  	    airoha_ppe_is_enabled(eth, 1))
-@@ -2170,8 +2205,7 @@ static int airoha_dev_stop(struct net_de
+@@ -2170,10 +2205,9 @@ static int airoha_dev_stop(struct net_de
  {
  	struct airoha_gdm_dev *dev = netdev_priv(netdev);
  	struct airoha_gdm_port *port = dev->port;
@@ -128,6 +128,8 @@ Signed-off-by: Lorenzo Bianconi <lorenzo@kernel.org>
 -	struct airoha_eth *eth = qdma->eth;
 +	struct airoha_qdma *qdma;
  	int i;
+ 
+ 	phylink_stop(dev->phylink);
  
  	netif_tx_disable(netdev);
 @@ -2179,26 +2213,14 @@ static int airoha_dev_stop(struct net_de
@@ -160,7 +162,7 @@ Signed-off-by: Lorenzo Bianconi <lorenzo@kernel.org>
 +	airoha_qdma_stop(qdma);
  	airoha_update_netdev_features(dev);
  
- 	phylink_stop(dev->phylink);
+ 	phylink_disconnect_phy(dev->phylink);
 @@ -2288,6 +2310,53 @@ static int airoha_enable_gdm2_loopback(s
  	return 0;
  }

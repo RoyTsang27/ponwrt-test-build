@@ -5,6 +5,12 @@ END {
 	# Filter-out OpenWrt packages which have a feeds equivalent
 	for (pkg in PKGS)
 		if (pkg in FEEDS) {
+			# Stale PON feed symlinks must not override the audited built-in tree.
+			if (PKGS[pkg] ~ /^pon\//) {
+				print "Ignoring feed override for integrated PON package " pkg > "/dev/stderr"
+				delete FEEDS[pkg]
+				continue
+			}
 			print PKGS[pkg] > of
 			delete PKGS[pkg]
 		}

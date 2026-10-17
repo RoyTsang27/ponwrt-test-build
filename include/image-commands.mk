@@ -91,11 +91,14 @@ metadata_json = \
 define Build/append-metadata
 	$(if $(SUPPORTED_DEVICES),-echo $(call metadata_json) | fwtool -I - $@)
 	sha256sum "$@" | cut -d" " -f1 > "$@.sha256sum"
-	$(if $(CONFIG_SIGN_FIRMWARE),[ ! -s "$(BUILD_KEY)" -o ! -s "$(BUILD_KEY).ucert" -o ! -s "$@" ] || { \
-		cp "$(BUILD_KEY).ucert" "$@.ucert" ;\
-		usign -S -m "$@" -s "$(BUILD_KEY)" -x "$@.sig" ;\
-		ucert -A -c "$@.ucert" -x "$@.sig" ;\
-		fwtool -S "$@.ucert" "$@" ;\
+	$(if $(CONFIG_SIGN_FIRMWARE),{ \
+		test -s "$(BUILD_KEY)" && test -s "$(BUILD_KEY).ucert" && test -s "$@" || { \
+			echo 'Firmware signing requires a key and certificate and nonempty image' >&2; exit 1; \
+		}; \
+		cp "$(BUILD_KEY).ucert" "$@.ucert" || { echo 'Firmware certificate copy failed' >&2; exit 1; }; \
+		usign -S -m "$@" -s "$(BUILD_KEY)" -x "$@.sig" || { echo 'Firmware usign signing failed' >&2; exit 1; }; \
+		ucert -A -c "$@.ucert" -x "$@.sig" || { echo 'Firmware ucert append failed' >&2; exit 1; }; \
+		fwtool -S "$@.ucert" "$@" || { echo 'Firmware signature attachment failed' >&2; exit 1; }; \
 	})
 endef
 
@@ -122,11 +125,14 @@ metadata_gl_json = \
 define Build/append-gl-metadata
 	$(if $(SUPPORTED_DEVICES),-echo $(call metadata_gl_json,$(SUPPORTED_DEVICES)) | fwtool -I - $@)
 	sha256sum "$@" | cut -d" " -f1 > "$@.sha256sum"
-	$(if $(CONFIG_SIGN_FIRMWARE),[ ! -s "$(BUILD_KEY)" -o ! -s "$(BUILD_KEY).ucert" -o ! -s "$@" ] || { \
-		cp "$(BUILD_KEY).ucert" "$@.ucert" ;\
-		usign -S -m "$@" -s "$(BUILD_KEY)" -x "$@.sig" ;\
-		ucert -A -c "$@.ucert" -x "$@.sig" ;\
-		fwtool -S "$@.ucert" "$@" ;\
+	$(if $(CONFIG_SIGN_FIRMWARE),{ \
+		test -s "$(BUILD_KEY)" && test -s "$(BUILD_KEY).ucert" && test -s "$@" || { \
+			echo 'Firmware signing requires a key and certificate and nonempty image' >&2; exit 1; \
+		}; \
+		cp "$(BUILD_KEY).ucert" "$@.ucert" || { echo 'Firmware certificate copy failed' >&2; exit 1; }; \
+		usign -S -m "$@" -s "$(BUILD_KEY)" -x "$@.sig" || { echo 'Firmware usign signing failed' >&2; exit 1; }; \
+		ucert -A -c "$@.ucert" -x "$@.sig" || { echo 'Firmware ucert append failed' >&2; exit 1; }; \
+		fwtool -S "$@.ucert" "$@" || { echo 'Firmware signature attachment failed' >&2; exit 1; }; \
 	})
 endef
 
