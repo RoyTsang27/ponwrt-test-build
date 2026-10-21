@@ -14,6 +14,9 @@ def check(kernel):
     mtk = (kernel / 'drivers/net/ethernet/mediatek/mtk_eth_soc.c').read_text()
     add_mac = function(mtk, 'static int mtk_add_mac(')
     airoha = (kernel / 'drivers/net/ethernet/airoha/airoha_eth.c').read_text()
+    open_airoha = function(airoha, 'static int airoha_dev_open(')
+    cleanup = open_airoha.split('\nerr_phy_stop:', 1)[-1]
+    pcs = (kernel / 'drivers/net/pcs/airoha/pcs-airoha-common.c').read_text()
     exit_flow = function((kernel / 'net/netfilter/nf_flow_table_core.c').read_text(),
                          'static void __exit nf_flow_table_module_exit(')
     realtek = (kernel / 'drivers/net/dsa/realtek/rtl8365mb_main.c').read_text()
@@ -35,6 +38,13 @@ def check(kernel):
          'Airoha device shutdown must stop phylink'),
         ('phylink_stop' not in function(airoha, 'static int airoha_dev_set_macaddr('),
          'Airoha MAC address changes must not contain the shutdown hunk'),
+        ('goto err_phy_stop;' in open_airoha and
+         'if (dev->phylink) {\n\t\tphylink_stop(dev->phylink);\n'
+         '\t\tphylink_disconnect_phy(dev->phylink);\n\t}' in cleanup,
+         'Airoha open failure must unwind phylink safely for PON devices'),
+        (function(pcs, 'static struct phylink_pcs *airoha_pcs_xlate(').count(
+            'index >= priv->data->num_port') == 1,
+         'Airoha PCS lookup must retain exactly one bounds check'),
     )
     for valid, message in conditions:
         if not valid:

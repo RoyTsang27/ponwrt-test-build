@@ -22,4 +22,4 @@ fragment register updates. Keep the lossless MIB reader on that lock.
 +	spin_unlock(&port->lock);
  }
  
- static void airoha_update_netdev_features(struct airoha_gdm_dev *dev)
+ static int airoha_dev_open(struct net_device *netdev)

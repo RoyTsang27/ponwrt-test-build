@@ -269,7 +269,7 @@ Signed-off-by: Jakub Kicinski <kuba@kernel.org>
  					FE_PSE_PORT_DROP);
 -			airoha_qdma_stop(qdma);
  			airoha_set_vip_for_gdm_port(dev, false);
- 			return err;
+ 			goto err_phy_stop;
  		}
 @@ -2412,8 +2404,6 @@
  	struct airoha_gdm_dev *dev = netdev_priv(netdev);
@@ -370,7 +370,7 @@ Signed-off-by: Jakub Kicinski <kuba@kernel.org>
 +
  	dma_dev = ctrl ? dev->eth->dev : owner_netdev->dev.parent;
  
- 	/* skb->dev identifies the netdev owning the BQL queue. */
+ 	/* skb->dev identifies the pon, omci, or oam netdev owning the BQL queue. */
 @@ -3062,7 +3074,7 @@
  		e->dma_addr = 0;
  	}

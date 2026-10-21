@@ -13,8 +13,10 @@ Signed-off-by: Lorenzo Bianconi <lorenzo@kernel.org>
 
 --- a/drivers/net/ethernet/airoha/airoha_eth.c
 +++ b/drivers/net/ethernet/airoha/airoha_eth.c
-@@ -11,8 +11,10 @@
+@@ -11,10 +11,12 @@
  #include <linux/pcs/pcs.h>
+ #include <linux/platform_device.h>
+ #include <linux/tcp.h>
  #include <linux/u64_stats_sync.h>
  #include <net/dst_metadata.h>
 +#include <net/ip6_checksum.h>
@@ -465,14 +467,16 @@ Signed-off-by: Lorenzo Bianconi <lorenzo@kernel.org>
 +	airoha_update_netdev_features(dev);
 +
  	return 0;
- }
  
-@@ -1896,6 +2171,7 @@ static int airoha_dev_stop(struct net_de
+ err_phy_stop:
+@@ -1896,8 +2171,9 @@ static int airoha_dev_stop(struct net_de
  	struct airoha_gdm_dev *dev = netdev_priv(netdev);
  	struct airoha_gdm_port *port = dev->port;
  	struct airoha_qdma *qdma = dev->qdma;
 +	struct airoha_eth *eth = qdma->eth;
  	int i;
+ 
+ 	phylink_stop(dev->phylink);
  
  	netif_tx_disable(netdev);
 @@ -1904,9 +2180,9 @@ static int airoha_dev_stop(struct net_de

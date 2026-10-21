@@ -40,10 +40,11 @@ def prepare(work):
 def check(source, work):
     compiler = shlex.split(os.environ.get('CC', 'cc'))
     # Model only the native socket types/prototype used by these wrappers.
-    # Verified against the official v6.12.108, v6.18.56, v6.18.57 and v6.19
+    # Verified against official v6.12.108, v6.18.56, v6.18.57, v6.18.58 and v6.19
     # headers. In particular, 6.18.57 adds the type but retains old connect().
     versions = [((6, 12, 108), False, False), ((6, 18, 56), False, False),
-                ((6, 18, 57), True, False), ((6, 19, 0), True, True)]
+                ((6, 18, 57), True, False), ((6, 18, 58), True, False),
+                ((6, 19, 0), True, True)]
     for version, native_unsized, new_connect in versions:
         label = '.'.join(map(str, version))
         case = work / label

@@ -84,7 +84,7 @@ Signed-off-by: Lorenzo Bianconi <lorenzo@kernel.org>
  
  	airoha_qdma_start(qdma);
 @@ -2177,30 +2180,6 @@ static int airoha_dev_open(struct net_de
- 	return 0;
+ 	return err;
  }
  
 -static void airoha_set_port_mtu(struct airoha_eth *eth,

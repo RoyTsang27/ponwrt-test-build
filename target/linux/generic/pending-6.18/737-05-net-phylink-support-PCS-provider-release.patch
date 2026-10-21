@@ -187,9 +187,10 @@ Signed-off-by: Christian Marangi <ansuelsmth@gmail.com>
  
  	if (pl->mac_ops->mac_select_pcs) {
  		pcs = pl->mac_ops->mac_select_pcs(pl->config,
-@@ -1009,9 +1024,14 @@ static unsigned int phylink_inband_caps(
+@@ -1009,10 +1024,15 @@ static unsigned int phylink_inband_caps(
  		}
  	}
+ 
  	if (IS_ERR_OR_NULL(pcs))
 -		return 0;
 +		goto exit;

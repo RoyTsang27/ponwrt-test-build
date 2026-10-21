@@ -304,7 +304,7 @@ index b37b425..12b1ad2 100644
 +	}
  	err = airoha_set_vip_for_gdm_port(dev, true);
  	if (err)
- 		return err;
+ 		goto err_phy_stop;
 @@ -2178,6 +2340,24 @@ static int airoha_dev_open(struct net_device *netdev)
  
  	airoha_update_netdev_features(dev);
@@ -323,11 +323,24 @@ index b37b425..12b1ad2 100644
 +					FE_PSE_PORT_DROP);
 +			airoha_qdma_stop(qdma);
 +			airoha_set_vip_for_gdm_port(dev, false);
-+			return err;
++			goto err_phy_stop;
 +		}
 +	}
 +
  	return 0;
+ 
+ err_phy_stop:
+@@ -2182,8 +2362,10 @@ static int airoha_dev_open(struct net_device *netdev)
+ err_phy_stop:
+ 	netif_tx_stop_all_queues(netdev);
+-	phylink_stop(dev->phylink);
+-	phylink_disconnect_phy(dev->phylink);
++	if (dev->phylink) {
++		phylink_stop(dev->phylink);
++		phylink_disconnect_phy(dev->phylink);
++	}
+ 
+ 	return err;
  }
  
 @@ -2187,8 +2367,14 @@ static int airoha_dev_stop(struct net_device *netdev)
