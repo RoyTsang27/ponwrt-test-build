@@ -4,7 +4,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=airoha-ponctl
 PKG_VERSION:=0.2.0
-PKG_RELEASE:=3
+PKG_RELEASE:=4
 PKG_URL:=https://github.com/pbs05/openwrt-pon-userspace/tree/main/airoha-ponctl
 
 PKG_LICENSE:=GPL-2.0-only
@@ -13,6 +13,7 @@ PKG_BUILD_PARALLEL:=1
 
 include $(INCLUDE_DIR)/package.mk
 include $(TOPDIR)/feeds/packages/lang/rust/rust-package.mk
+include $(TOPDIR)/package/pon/userspace/rust-vendor.mk
 
 define Package/airoha-ponctl
   SECTION:=net
@@ -34,6 +35,7 @@ define Build/Prepare
 	mkdir -p $(PKG_BUILD_DIR)
 	$(CP) ./src/Cargo.toml ./src/Cargo.lock $(PKG_BUILD_DIR)/
 	$(CP) ./src/src $(PKG_BUILD_DIR)/
+	$(call PON/CargoPrepare)
 endef
 
 define Package/airoha-ponctl/install

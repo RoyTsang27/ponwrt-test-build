@@ -4,7 +4,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=airoha-pon-daemons
 PKG_VERSION:=0.3.0
-PKG_RELEASE:=4
+PKG_RELEASE:=5
 PKG_URL:=https://github.com/pbs05/openwrt-pon-userspace/tree/main/airoha-pon-daemons
 
 PKG_LICENSE:=GPL-2.0-only
@@ -14,6 +14,7 @@ PKG_BUILD_PARALLEL:=1
 
 include $(INCLUDE_DIR)/package.mk
 include $(TOPDIR)/feeds/packages/lang/rust/rust-package.mk
+include $(TOPDIR)/package/pon/userspace/rust-vendor.mk
 
 define Package/airoha-pond
   SECTION:=net
@@ -31,6 +32,7 @@ define Build/Prepare
 	mkdir -p $(PKG_BUILD_DIR)
 	$(CP) ./src/Cargo.toml ./src/Cargo.lock ./src/LICENSE $(PKG_BUILD_DIR)/
 	$(CP) ./src/src $(PKG_BUILD_DIR)/
+	$(call PON/CargoPrepare)
 endef
 
 define Package/airoha-pond/install

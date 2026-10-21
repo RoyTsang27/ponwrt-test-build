@@ -51,6 +51,7 @@ jobs:
           rustup toolchain install 1.90.0 --profile minimal
           cargo +1.90.0 test --locked --manifest-path package/pon/userspace/airoha-pon-daemons/src/Cargo.toml
           cargo +1.90.0 test --locked --manifest-path package/pon/userspace/airoha-ponctl/src/Cargo.toml
+          RUSTUP_TOOLCHAIN=1.90.0 python3 scripts/check-pon-cargo.py "$RUNNER_TEMP/pon-cargo-offline"
           cargo +1.90.0 install --locked cargo-audit --version 0.22.2
           cargo +1.90.0 audit --file package/pon/userspace/airoha-pon-daemons/src/Cargo.lock
           cargo +1.90.0 audit --file package/pon/userspace/airoha-ponctl/src/Cargo.lock
