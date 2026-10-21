@@ -33,6 +33,8 @@ jobs:
           python3 scripts/build-signing-test-tools.py "$RUNNER_TEMP/signing-tools"
           PONWRT_SIGNING_TOOLS="$RUNNER_TEMP/signing-tools/install/bin" \
             python3 -m unittest discover -s tests -p test_signing_integration.py -v
+      - name: Compile mac80211 stable socket compatibility cases
+        run: python3 scripts/check-mac80211-compat.py "$RUNNER_TEMP/mac80211-compat"
       - name: PON file safety tests with real Linux ownership checks
         run: sudo python3 -m unittest discover -s tests -p test_pon_security.py -v
       - name: PON helper tests with BusyBox ash and applets

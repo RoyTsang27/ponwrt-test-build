@@ -6,6 +6,7 @@ on:
       - target/linux/generic/**
       - target/linux/airoha/**
       - package/pon/**
+      - package/kernel/mac80211/**
       - include/scan.awk
       - .github/workflows/kernel-prepare.yml
       - feeds.conf.release
@@ -19,6 +20,7 @@ on:
       - target/linux/generic/**
       - target/linux/airoha/**
       - package/pon/**
+      - package/kernel/mac80211/**
       - include/scan.awk
       - .github/workflows/kernel-prepare.yml
       - feeds.conf.release
@@ -80,6 +82,8 @@ jobs:
             profile=configs/an7581-tcboot.config
           fi
           ./scripts/kconfig.pl + "$profile" configs/release.config > .config
+          # Build wireless backports as packages, without installing them in images.
+          printf '\nCONFIG_PACKAGE_kmod-cfg80211=m\nCONFIG_PACKAGE_kmod-mac80211=m\n' >> .config
           make defconfig
           python3 scripts/check-release.py --config .config
           make target/linux/prepare -j"$(nproc)" V=s
@@ -94,6 +98,10 @@ jobs:
         run: |
           set -o pipefail
           make target/linux/compile -j"$(nproc)" V=s 2>&1 | tee kernel-build.log
+      - name: Compile mac80211 backport modules
+        run: |
+          set -o pipefail
+          make package/kernel/mac80211/compile -j"$(nproc)" V=s 2>&1 | tee mac80211-build.log
       - name: Compile integrated PON drivers and userspace packages
         run: |
           set -o pipefail
