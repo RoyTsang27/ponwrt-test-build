@@ -13,6 +13,7 @@ on:
       - configs/**
       - config/**
       - scripts/check-release.py
+      - scripts/check-pon-profiles.py
       - scripts/check-kernel-patches.py
       - scripts/check-tcboot-image.py
   pull_request:
@@ -27,6 +28,7 @@ on:
       - configs/**
       - config/**
       - scripts/check-release.py
+      - scripts/check-pon-profiles.py
       - scripts/check-kernel-patches.py
       - scripts/check-tcboot-image.py
   workflow_dispatch:
@@ -77,15 +79,19 @@ jobs:
           cat configs/release.config >> .config
           make defconfig
           python3 scripts/check-release.py --pon-config .config
+          python3 scripts/check-pon-profiles.py --config .config
           profile="configs/$TARGET.config"
           if [ "$TARGET" = an7581 ]; then
             profile=configs/an7581-tcboot.config
+          else
+            profile=configs/an7583-mf-ubi.config
           fi
           ./scripts/kconfig.pl + "$profile" configs/release.config > .config
           # Build wireless backports as packages, without installing them in images.
           printf '\nCONFIG_PACKAGE_kmod-cfg80211=m\nCONFIG_PACKAGE_kmod-mac80211=m\n' >> .config
           make defconfig
           python3 scripts/check-release.py --config .config
+          python3 scripts/check-pon-profiles.py --config .config
           make target/linux/prepare -j"$(nproc)" V=s
           python3 scripts/check-kernel-patches.py \
             build_dir/target-*/linux-airoha_"$TARGET"/linux-[0-9]*
@@ -113,14 +119,22 @@ jobs:
             package/pon/userspace/airoha-pon-debug/compile \
             package/pon/userspace/luci-app-pon/compile \
             package/pon/userspace/luci-app-iptv/compile 2>&1 | tee pon-build.log
-      - name: Build and verify XG-040G-MD tcboot factory and sysupgrade images
-        if: matrix.target == 'an7581'
+      - name: Assemble signed images and verify installed PON frontend files
+        env:
+          TARGET: ${{ matrix.target }}
         run: |
           set -o pipefail
-          make -j"$(nproc)" V=s 2>&1 | tee tcboot-image-build.log
-          python3 scripts/check-tcboot-image.py \
-            bin/targets/airoha/an7581/*nokia_xg-040g-md-tcboot-squashfs-factory.bin
-          bash scripts/verify-release.sh bin/targets/airoha/an7581
+          make -j"$(nproc)" V=s 2>&1 | tee image-build.log
+          profile=nokia_xg-040g-mf-ubi
+          if [ "$TARGET" = an7581 ]; then
+            profile=nokia_xg-040g-md-tcboot
+            python3 scripts/check-tcboot-image.py \
+              bin/targets/airoha/an7581/*nokia_xg-040g-md-tcboot-squashfs-factory.bin
+          fi
+          roots=(build_dir/target-*/root-airoha)
+          test "${#roots[@]}" -eq 1
+          python3 scripts/check-pon-profiles.py --rootfs "$profile" "${roots[0]}"
+          bash scripts/verify-release.sh "bin/targets/airoha/$TARGET"
       - name: Upload build diagnostics
         if: failure()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

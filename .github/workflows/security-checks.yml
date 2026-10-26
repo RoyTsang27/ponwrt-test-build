@@ -24,6 +24,10 @@ jobs:
         run: |
           python3 -m unittest discover -s tests -v
           python3 scripts/check-release.py
+          python3 scripts/check-pon-profiles.py \
+            --config configs/an7581.config --config configs/an7581-tcboot.config \
+            --config configs/an7583.config --config configs/an7583-mf-ubi.config
+          node --test tests/test_pon_status.js
           sh -n scripts/load-release-keys.sh
           bash -n scripts/verify-release.sh
       - name: Build real signing tools and test signed images

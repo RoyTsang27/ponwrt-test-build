@@ -110,6 +110,7 @@ jobs:
             configs/release.config > .config
           make defconfig
           python3 scripts/check-release.py --config .config
+          python3 scripts/check-pon-profiles.py --config .config
 
       - name: Download sources
         run: make download -j"$(nproc)"

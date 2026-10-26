@@ -11,7 +11,8 @@
 			],
 			"ubus": {
 				"file": [
-					"read"
+					"read",
+					"exec"
 				]
 			},
 			"file": {

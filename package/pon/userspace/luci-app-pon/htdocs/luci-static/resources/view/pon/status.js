@@ -203,17 +203,33 @@ function displayBroadcastKeys(values) {
 		? _('Key index %s').format(values.broadcast_key_indexes.join(', ')) : _('Not provisioned');
 }
 
-function loadProtocolStatus(section, unavailable, invalid) {
-	return L.resolveDefault(
-		fs.exec_direct('/usr/bin/pondctl', [ 'status', '--line', section.line ]), null
-	).then(function(output) {
-		if (output == null)
-			return { section: section, values: {}, error: unavailable };
+function isObject(value) {
+	return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function readStatus(command, args, unavailable, invalid, validate) {
+	/* Keep the exit status and stderr: cgi-exec's stdout alone hides probe and socket errors. */
+	return fs.exec(command, args).then(function(result) {
+		if (!result || result.code !== 0)
+			return { values: {}, error: result &&
+				(String(result.stderr || '').trim() || String(result.stdout || '').trim()) || unavailable };
 		try {
-			return { section: section, values: JSON.parse(output), error: null };
+			var values = JSON.parse(result.stdout);
+			if (!isObject(values) || (validate && !validate(values)))
+				throw new Error('status schema');
+			return { values: values, error: null };
 		} catch (exception) {
-			return { section: section, values: {}, error: invalid };
+			return { values: {}, error: invalid };
 		}
+	}, function(error) {
+		return { values: {}, error: unavailable + (error && error.message ? ': ' + error.message : '') };
+	});
+}
+
+function loadProtocolStatus(section, unavailable, invalid) {
+	return readStatus('/usr/bin/pondctl', [ 'status', '--line', section.line ],
+		unavailable, invalid).then(function(result) {
+		return { section: section, values: result.values, error: result.error };
 	});
 }
 
@@ -230,21 +246,15 @@ function loadStatus() {
 
 		if (!device)
 			return Promise.resolve({ section: section, line: {}, error: _('No device configured') });
-		return L.resolveDefault(fs.exec_direct('/usr/sbin/ponctl',
-			[ '--device', device, 'status', '--json' ]), null).then(function(output) {
-			var snapshot;
-			try {
-				snapshot = JSON.parse(output);
-				if (snapshot.schema_version !== 1 || !snapshot.line)
-					throw new Error('status schema');
-			} catch (error) {
-				return { section: section, line: {},
-					error: output == null ? _('Device unavailable') :
-						_('Invalid status response') };
-			}
+		return readStatus('/usr/sbin/ponctl', [ '--device', device, 'status', '--json' ],
+			_('Device unavailable'), _('Invalid status response'), function(snapshot) {
+				return snapshot.schema_version === 1 && isObject(snapshot.line);
+			}).then(function(result) {
+			var snapshot = result.values;
 			return {
 				section: section,
-				line: snapshot.line,
+				line: snapshot.line || {},
+				error: result.error,
 				frontend: snapshot.frontend,
 				registration: snapshot.registration,
 				datapath: snapshot.datapath,
