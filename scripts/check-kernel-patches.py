@@ -22,6 +22,19 @@ def check(kernel):
     realtek = (kernel / 'drivers/net/dsa/realtek/rtl8365mb_main.c').read_text()
     serial = function((kernel / 'drivers/tty/serial/8250/8250_port.c').read_text(),
                       'static void set_io_from_upio(')
+    bridge = function((kernel / 'net/bridge/netfilter/nf_conntrack_bridge.c').read_text(),
+                      'static unsigned int nf_ct_bridge_pre(')
+    tcp_get = function((kernel / 'net/ipv4/tcp.c').read_text(), 'int do_tcp_getsockopt(')
+    for option in ('TCP_CC_INFO', 'TCP_CONGESTION'):
+        marker = '\tcase ' + option + ': {'
+        if marker not in tcp_get:
+            raise ValueError('Missing TCP socket option: ' + option)
+        block = tcp_get.split(marker, 1)[1].split('\n\t}', 1)[0]
+        operations = ('rcu_read_lock();', 'READ_ONCE(icsk->icsk_ca_ops)', 'rcu_read_unlock();',
+                      'copy_to_sockptr(optval,')
+        if (not all(op in block for op in operations) or
+                [block.index(op) for op in operations] != sorted(block.index(op) for op in operations)):
+            raise ValueError(option + ' must snapshot congestion-control data under RCU before copying to userspace')
     conditions = (
         (serial.count('case UPIO_AU:') == 1,
          '8250 serial I/O selection must have exactly one UPIO_AU case'),
@@ -45,6 +58,9 @@ def check(kernel):
         (function(pcs, 'static struct phylink_pcs *airoha_pcs_xlate(').count(
             'index >= priv->data->num_port') == 1,
          'Airoha PCS lookup must retain exactly one bounds check'),
+        ('skb_ipv6_payload_len(skb)' in bridge and
+         'ntohs(ipv6_hdr(skb)->payload_len)' not in bridge,
+         'Bridge conntrack must preserve the upstream IPv6 payload-length helper'),
     )
     for valid, message in conditions:
         if not valid:

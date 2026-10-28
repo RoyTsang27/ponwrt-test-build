@@ -256,6 +256,18 @@ class ReleaseTests(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertEqual(list(Path(temp).iterdir()), [])
 
+    def test_minimal_device_profiles_include_complete_release_policy(self):
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / '.config'
+            for profile in ('an7581-tcboot.config', 'an7583-mf-ubi.config'):
+                with self.subTest(profile=profile):
+                    merged = subprocess.check_output([
+                        'perl', str(ROOT / 'scripts/kconfig.pl'), '+',
+                        str(ROOT / 'configs' / profile), str(ROOT / 'configs/release.config')
+                    ], text=True)
+                    path.write_text(merged)
+                    release.check_config(path)
+
     def test_unsigned_sysupgrade_rejected_by_device_policy(self):
         path = ROOT / 'package/base-files/files/lib/upgrade/fwtool.sh'
         script = '. "$1"; REQUIRE_IMAGE_SIGNATURE=1; fwtool() { return 1; }; v() { :; }; fwtool_check_signature image'
