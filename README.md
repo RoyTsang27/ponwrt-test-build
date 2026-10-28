@@ -93,6 +93,10 @@ There is no need to run `make clean` for this failure. More RAM, swap (where
 permitted), or a higher container memory limit may be necessary if one compiler
 process still cannot fit.
 
+If GLib fails with `Run-time dependency libffi found: NO` followed by
+`Subproject exists but has no meson.build file`, see the
+[target libffi staging diagnosis and rebuild steps](docs/GLIB2-BUILD.md).
+
 For signed releases and kernel update checks, see [SECURITY.md](SECURITY.md).
 Release workflows use pinned feeds; development feeds continue to follow upstream.
 

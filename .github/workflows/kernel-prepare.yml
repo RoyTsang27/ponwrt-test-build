@@ -89,6 +89,8 @@ jobs:
           ./scripts/kconfig.pl + "$profile" configs/release.config > .config
           # Build wireless backports as packages, without installing them in images.
           printf '\nCONFIG_PACKAGE_kmod-cfg80211=m\nCONFIG_PACKAGE_kmod-mac80211=m\n' >> .config
+          # Exercise GLib's split packages without selecting GObject/GIO or libffi.
+          printf 'CONFIG_PACKAGE_glib2-core=m\n' >> .config
           make defconfig
           python3 scripts/check-release.py --config .config
           python3 scripts/check-pon-profiles.py --config .config
@@ -100,6 +102,20 @@ jobs:
           set -o pipefail
           make tools/install -j"$(nproc)" V=s 2>&1 | tee tools-build.log
           make toolchain/install -j"$(nproc)" V=s 2>&1 | tee toolchain-build.log
+      - name: Compile GLib core with target build dependencies
+        run: |
+          set -o pipefail
+          grep -qx 'CONFIG_PACKAGE_glib2-core=m' .config
+          if grep -Eq '^CONFIG_PACKAGE_(glib2|glib2-gobject|glib2-gio|libffi)=[ym]$' .config; then
+            echo 'GLib core regression requires GObject, GIO and libffi to be unselected' >&2
+            exit 1
+          fi
+          # Let the generated dependency graph build/stage libffi; do not mask
+          # missing dependencies by compiling libffi explicitly in this test.
+          make package/feeds/packages/glib2/compile -j"$(nproc)" V=s 2>&1 | tee glib2-build.log
+          target_dirs=(staging_dir/target-*)
+          test "${#target_dirs[@]}" -eq 1
+          test -s "${target_dirs[0]}/usr/lib/pkgconfig/libffi.pc"
       - name: Compile kernel and modules
         run: |
           set -o pipefail
