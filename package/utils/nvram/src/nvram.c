@@ -327,8 +327,8 @@ int nvram_commit(nvram_handle_t *h)
 	*ptr = '\0';
 	ptr++;
 
-	if( (int)ptr % 4 )
-		memset(ptr, 0, 4 - ((int)ptr % 4));
+	if( (uintptr_t)ptr % 4 )
+		memset(ptr, 0, 4 - ((uintptr_t)ptr % 4));
 
 	ptr++;
 

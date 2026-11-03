@@ -115,6 +115,7 @@ directly: EN7572 for Nokia/ZNXT/Unionman/H3C/Gemtek PON boards, and paged-BOSA
 for FiberHome boards. The [PON frontend check](docs/PON-FRONTENDS.md) lists the
 audited profiles, build checks, and the missing-status diagnosis.
 
-Linux 6.18.59 and the XG-040G-MD tcboot profile are documented in
-[the kernel update](docs/KERNEL-6.18.59.md) and
+Linux 6.18.60 and the XG-040G-MD tcboot profile are documented in
+[the kernel update](docs/KERNEL-6.18.60.md),
+[the upstream integration audit](docs/UPSTREAM-AUDIT-2026-11-03.md), and
 [the tcboot build guide](docs/XG-040G-MD-TCBOOT.md).

@@ -78,7 +78,7 @@ trx_fixup(int fd, const char *name)
 	}
 
 	len = mtdInfo.size;
-	if (mtdInfo.size <= 0) {
+	if (mtdInfo.size < sizeof(struct trx_header)) {
 		fprintf(stderr, "Invalid MTD device size\n");
 		goto err;
 	}

@@ -28,17 +28,24 @@ metadata, an incomplete libffi staging installation, a local recipe override,
 or use of `NO_DEPS=1`. The earlier failed Meson feature probes are expected
 configure checks, not separate compilation defects.
 
+The November 3 integration includes upstream's move of libffi into
+`package/libs/libffi`, together with its `fficonfig.h` staging fix. This also
+supports development feeds that have removed their old libffi recipe. Remove
+any stale feed link before rebuilding so the in-tree recipe is used. The
+release feed pins remain unchanged.
+
 In the failing Linux checkout, retain `.config` and the toolchain, then regenerate
 metadata and rebuild only the affected packages:
 
 ```sh
 ./scripts/feeds update -i packages
-./scripts/feeds install libffi glib2
+./scripts/feeds uninstall libffi
+./scripts/feeds install glib2
 rm -rf tmp
 make defconfig
 make package/feeds/packages/glib2/clean -j1 V=s
-make package/feeds/packages/libffi/clean -j1 V=s
-make package/feeds/packages/libffi/compile -j1 V=s
+make package/libs/libffi/clean -j1 V=s
+make package/libs/libffi/compile -j1 V=s
 ls -l staging_dir/target-*/usr/lib/pkgconfig/libffi.pc
 make package/feeds/packages/glib2/compile -j1 V=s
 make -j2 V=s

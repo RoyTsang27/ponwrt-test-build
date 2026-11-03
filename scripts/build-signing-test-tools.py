@@ -23,7 +23,8 @@ def build(work):
     env = dict(os.environ)
     env['PKG_CONFIG_PATH'] = str(prefix / 'lib/pkgconfig')
     packages = (
-        ('json-c', 'package/libs/libjson-c', ['-DBUILD_SHARED_LIBS=OFF', '-DDISABLE_EXTRA_LIBS=TRUE']),
+        ('json-c', 'package/libs/libjson-c', ['-DBUILD_SHARED_LIBS=OFF', '-DDISABLE_EXTRA_LIBS=TRUE',
+                                          '-DBUILD_APPS=OFF']),
         ('libubox', 'package/libs/libubox', ['-DBUILD_LUA=OFF', '-DBUILD_EXAMPLES=OFF']),
         ('usign', 'package/system/usign', []),
         ('ucert', 'package/system/ucert', ['-DUCERT_FULL=1', '-DUCERT_HOST_BUILD=1',
@@ -36,7 +37,11 @@ def build(work):
         if name == 'json-c':
             version = field(makefile, 'PKG_VERSION', r'\d+(?:\.\d+)+')
             filename = 'json-c-' + version + '-nodoc.tar.gz'
-            url = 'https://s3.amazonaws.com/json-c_releases/releases/' + filename
+            source_url = field(makefile, 'PKG_SOURCE_URL', r'https://[^\s]+')
+            source_url = source_url.replace('$(PKG_VERSION)', version)
+            if '$' in source_url:
+                raise ValueError('Unsupported json-c source URL expansion')
+            url = source_url.rstrip('/') + '/' + filename
             checksum = field(makefile, 'PKG_HASH', '[0-9a-f]{64}')
         else:
             date = field(makefile, 'PKG_SOURCE_DATE', r'\d{4}-\d{2}-\d{2}')
