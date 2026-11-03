@@ -93,12 +93,14 @@ jobs:
             profile=configs/an7583-mf-ubi.config
           fi
           ./scripts/kconfig.pl + "$profile" configs/release.config > .config
-          # Build wireless backports as packages, without installing them in images.
-          printf '\nCONFIG_PACKAGE_kmod-cfg80211=m\nCONFIG_PACKAGE_kmod-mac80211=m\n' >> .config
-          # Exercise GLib's split packages without selecting GObject/GIO or libffi.
-          printf 'CONFIG_PACKAGE_glib2-core=m\n' >> .config
-          # Compile both reviewed TLS implementations without adding Wi-Fi services to images.
-          printf 'CONFIG_PACKAGE_wpad-openssl=m\nCONFIG_PACKAGE_wpad-mbedtls=m\n' >> .config
+          {
+            # Build wireless backports as packages, without installing them in images.
+            printf '\nCONFIG_PACKAGE_kmod-cfg80211=m\nCONFIG_PACKAGE_kmod-mac80211=m\n'
+            # Exercise GLib's split packages without selecting GObject/GIO or libffi.
+            printf 'CONFIG_PACKAGE_glib2-core=m\n'
+            # Compile both reviewed TLS implementations without adding Wi-Fi services to images.
+            printf 'CONFIG_PACKAGE_wpad-openssl=m\nCONFIG_PACKAGE_wpad-mbedtls=m\n'
+          } >> .config
           make defconfig
           python3 scripts/check-release.py --config .config
           python3 scripts/check-pon-profiles.py --config .config
