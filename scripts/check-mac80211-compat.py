@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compile the mac80211 socket wrappers across the 6.18.57 stable API change."""
+"""Compile the mac80211 socket wrappers across the stable socket API changes."""
 import argparse
 import hashlib
 import os
@@ -40,12 +40,13 @@ def prepare(work):
 def check(source, work):
     compiler = shlex.split(os.environ.get('CC', 'cc'))
     # Model only the native socket types/prototype used by these wrappers.
-    # Verified against official v6.12.108, v6.18.56 through v6.18.60, and v6.19
-    # headers. In particular, 6.18.57 adds the type but retains old connect().
+    # Linux 6.18.57 adds the type without changing kernel_connect().
+    # Linux 6.18.61 removes the type again, as verified in the stable headers.
     versions = [((6, 12, 108), False, False), ((6, 18, 56), False, False),
                 ((6, 18, 57), True, False), ((6, 18, 58), True, False),
                 ((6, 18, 59), True, False),
-                ((6, 18, 60), True, False),
+                ((6, 18, 60), True, False), ((6, 18, 61), False, False),
+                ((6, 18, 62), False, False),
                 ((6, 19, 0), True, True)]
     for version, native_unsized, new_connect in versions:
         label = '.'.join(map(str, version))
