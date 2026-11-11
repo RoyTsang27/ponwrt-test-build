@@ -46,7 +46,7 @@ def check(source, work):
                 ((6, 18, 57), True, False), ((6, 18, 58), True, False),
                 ((6, 18, 59), True, False),
                 ((6, 18, 60), True, False), ((6, 18, 61), False, False),
-                ((6, 18, 62), False, False),
+                ((6, 18, 62), False, False), ((6, 18, 63), False, False),
                 ((6, 19, 0), True, True)]
     for version, native_unsized, new_connect in versions:
         label = '.'.join(map(str, version))
