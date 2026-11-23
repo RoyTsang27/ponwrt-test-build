@@ -51,17 +51,17 @@ Signed-off-by: Bohdan Chubuk <chbgdn@gmail.com>
  
 -	if (path->bridge.vlan_mode == DEV_PATH_BR_VLAN_TAG)
 -		path->bridge.vlan_mode = DEV_PATH_BR_VLAN_KEEP;
--	else if (v->priv_flags & BR_VLFLAG_ADDED_BY_SWITCHDEV)
+-	else if (v->priv_flags & BR_VLFLAG_TAGGING_BY_SWITCHDEV)
 -		path->bridge.vlan_mode = DEV_PATH_BR_VLAN_UNTAG_HW;
 -	else
 -		path->bridge.vlan_mode = DEV_PATH_BR_VLAN_UNTAG;
 +	if (path->bridge.vlan_mode == DEV_PATH_BR_VLAN_TAG) {
-+		if (v->priv_flags & BR_VLFLAG_ADDED_BY_SWITCHDEV)
++		if (v->priv_flags & BR_VLFLAG_TAGGING_BY_SWITCHDEV)
 +			path->bridge.vlan_mode = DEV_PATH_BR_VLAN_KEEP_HW;
 +		else
 +			path->bridge.vlan_mode = DEV_PATH_BR_VLAN_KEEP;
 +	} else {
-+		if (v->priv_flags & BR_VLFLAG_ADDED_BY_SWITCHDEV)
++		if (v->priv_flags & BR_VLFLAG_TAGGING_BY_SWITCHDEV)
 +			path->bridge.vlan_mode = DEV_PATH_BR_VLAN_UNTAG_HW;
 +		else
 +			path->bridge.vlan_mode = DEV_PATH_BR_VLAN_UNTAG;
