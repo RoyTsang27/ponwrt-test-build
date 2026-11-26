@@ -4,13 +4,23 @@ REQUIRE_IMAGE_METADATA=1
 
 airoha_require_tcboot_layout()
 {
-	local ubidev volume
+	local ubidev volume id=0
 
 	ubidev="$(nand_find_ubi ubi)"
 	[ -n "$ubidev" ] || {
 		echo "tcboot UBI is not initialized; restore it through tcboot recovery."
 		return 1
 	}
+	if [ "$1" = nokia,xg-040g-md-tcboot ]; then
+		for volume in bosa ri kernel rootfs; do
+			[ "$(nand_find_volume "$ubidev" "$volume")" = "${ubidev}_${id}" ] || {
+				echo "tcboot volume $volume must use ID $id. Reinstall through tcboot recovery and restore bosa/ri."
+				return 1
+			}
+			id=$((id + 1))
+		done
+		return 0
+	fi
 	for volume in bosa ri; do
 		[ -n "$(nand_find_volume "$ubidev" "$volume")" ] || {
 			echo "PON volume $volume is missing; restore its stock backup before upgrading."
@@ -45,13 +55,19 @@ airoha_require_ubi_layout()
 
 platform_check_image() {
 	local board=$(board_name)
+	local profile
 
 	[ "$#" -gt 1 ] && return 1
 
 	case "$board" in
-	nokia,xg-040g-md-tcboot)
+	nokia,xg-040g-md-tcboot|\
+	nokia,xg-140g-tf-tcboot)
 		# Whole-UBI uploads can erase calibration. Accept this profile's tar only.
-		tar tf "$1" sysupgrade-nokia_xg-040g-md-tcboot/CONTROL >/dev/null 2>&1 || return 1
+		profile="$(echo "$board" | tr ',' '_')"
+		tar tf "$1" "sysupgrade-$profile/CONTROL" >/dev/null 2>&1 || return 1
+		if [ "$board" = nokia,xg-040g-md-tcboot ]; then
+			airoha_require_tcboot_layout "$board" || return 1
+		fi
 		nand_do_platform_check "$board" "$1"
 		return $?
 		;;
@@ -78,11 +94,12 @@ platform_do_upgrade() {
 	local board=$(board_name)
 
 	case "$board" in
-		nokia,xg-040g-md-tcboot)
+		nokia,xg-040g-md-tcboot|\
+		nokia,xg-140g-tf-tcboot)
 			CI_UBIPART=ubi
 			CI_KERNPART=kernel
 			CI_SKIP_KERNEL_MTD=1
-			airoha_require_tcboot_layout && nand_do_upgrade "$1"
+			airoha_require_tcboot_layout "$board" && nand_do_upgrade "$1"
 			;;
 		gemtek,w1700k-ubi|\
 		quantum,q1000k-ubi)

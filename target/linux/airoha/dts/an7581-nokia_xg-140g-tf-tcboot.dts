@@ -1,0 +1,14 @@
+// SPDX-License-Identifier: GPL-2.0-only OR MIT
+
+#include "an7581-nokia_xg-040g-tf-common.dtsi"
+#include "an7581-nokia-tcboot-parts.dtsi"
+
+/ {
+	model = "Nokia XG-140G-TF (tcboot)";
+	compatible = "nokia,xg-140g-tf-tcboot", "nokia,xg-140g-tf",
+		     "airoha,an7581", "airoha,en7581";
+
+	chosen {
+		bootargs = "ubi.mtd=ubi root=/dev/ubiblock0_1 rootfstype=squashfs ro rootwait console=ttyS0,115200 earlycon";
+	};
+};

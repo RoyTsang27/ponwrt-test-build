@@ -25,11 +25,13 @@ The authors and contributors are not responsible for device damage, network serv
 | AN7581 | Nokia XG-040G-MD tcboot | `nokia_xg-040g-md-tcboot` | `bosa`, `ri` (UBI volumes) |
 | AN7581 | Nokia XG-040G-MD UBI | `nokia_xg-040g-md-ubi` | `bosa`, `ri` |
 | AN7581 | Nokia XG-040G-TF UBI | `nokia_xg-040g-tf-ubi` | `bosa`, `ri` |
+| AN7581 | Nokia XG-140G-TF tcboot | `nokia_xg-140g-tf-tcboot` | `bosa`, `ri` (UBI volumes) |
 | AN7581 | UnionMan UNG00A | `unionman_ung00a` | `reservearea` |
 | AN7581 | ZNXT ZN504XG-D | `znxt_zn504xg-d` | `reservearea` |
 | AN7581 | ZNXT ZN515XG-D | `znxt_zn515xg-d` | `reservearea` |
 | AN7581 | H3C HM2004-DU | `h3c_hm2004-du` | `factory` |
 | AN7583 | Nokia XG-040G-MF | `nokia_xg-040g-mf`, `nokia_xg-040g-mf-ubi` | `bosa`, `ri` |
+| ZX279133 | Skyworth SK-D840N | `skyworth_sk-d840n` | Native241 `parameter tags` partition |
 
 ## Build
 
@@ -73,6 +75,8 @@ make -j$(nproc)
 
 Images are written to `bin/targets/airoha/an7581/` or `bin/targets/airoha/an7583/`.
 
+For the ZTE-based Skyworth, follow the [SK-D840N build and image guide](docs/SK-D840N.md).
+
 When building LLVM locally, Clang compilation is limited to two concurrent jobs
 using [LLVM's Ninja job pool](https://llvm.org/docs/CMake.html#frequently-used-llvm-related-variables),
 independently of the firmware's `make -j` setting. Set
@@ -102,6 +106,8 @@ Release workflows use pinned feeds; development feeds continue to follow upstrea
 
 ## Install
 
+For an existing Nokia tcboot U-Boot installation, use the [tcboot build and image guide](docs/XG-040G-MD-TCBOOT.md).
+
 Use [AN758x-Stock2UBI](https://github.com/pbs05/an758x-stock2ubi) to back up the stock flash and install the UBI layout. Boot images and Web recovery are provided by [AN758x U-Boot](https://github.com/pbs05/uboot-an758x).
 
 After installing PonWrt, restore the stock calibration and identity data through U-Boot Web or **Network → PON → Configuration → PON board data** in LuCI. Convert FiberHome `factory` backups with [FiberHome Factory](https://github.com/pbs05/fiberhome-factory) first. Restore converted FiberHome data, `reservearea`, or `dsd` backups to the PonWrt `factory` volume. Nokia `bosa` and `ri` backups use volumes with the same names.
@@ -115,7 +121,6 @@ directly: EN7572 for Nokia/ZNXT/Unionman/H3C/Gemtek PON boards, and paged-BOSA
 for FiberHome boards. The [PON frontend check](docs/PON-FRONTENDS.md) lists the
 audited profiles, build checks, and the missing-status diagnosis.
 
-Linux 6.18.60 and the XG-040G-MD tcboot profile are documented in
+Linux 6.18.60 is documented in
 [the kernel update](docs/KERNEL-6.18.60.md),
-[the upstream integration audit](docs/UPSTREAM-AUDIT-2026-11-03.md), and
-[the tcboot build guide](docs/XG-040G-MD-TCBOOT.md).
+and [the upstream integration audit](docs/UPSTREAM-AUDIT-2026-11-03.md).

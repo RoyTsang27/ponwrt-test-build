@@ -424,15 +424,16 @@ endef
 TARGET_DEVICES += nokia_xg-040g-md-ubi-usb-sfp
 
 define Build/nokia-tcboot-pon-placeholders
-  head -c 262144 /dev/zero | tr '\000' '\377' > $(KDIR)/nokia-tcboot-empty-pon-data.bin
+  head -c 262144 /dev/zero | LC_ALL=C tr '\000' '\377' > $@.pon-data && \
+    mv $@.pon-data $(KDIR)/nokia-tcboot-empty-pon-data.bin
 endef
 
-define Device/nokia_xg-040g-md-tcboot
-  $(call Device/nokia_xg-040g-md-common)
+define Device/nokia-tcboot-images
   DEVICE_VARIANT := (tcboot)
-  DEVICE_DTS := an7581-nokia_xg-040g-md-tcboot
+  DEVICE_DESCRIPTION := For an existing TCBOOT U-Boot installation with bootloader/env/ubi partitions. \
+    Builds FIT-prefixed factory.bin, raw factory-ubi.bin and signed sysupgrade.bin images. \
+    Back up and restore this device's bosa and ri volumes when using factory recovery.
   SOC := an7581
-  KERNEL_LOADADDR := 0x80088000
   KERNEL_SIZE := 8192k
   IMAGE_SIZE := 261120k
   KERNEL_IN_UBI := 1
@@ -440,13 +441,46 @@ define Device/nokia_xg-040g-md-tcboot
   # Reserve personal-data volumes before rootfs_data consumes the free space.
   UBINIZE_PARTS_AFTER := bosa=:$(KDIR)/nokia-tcboot-empty-pon-data.bin \
     ri=:$(KDIR)/nokia-tcboot-empty-pon-data.bin
-  IMAGES := factory.bin sysupgrade.bin
+  IMAGES := factory.bin factory-ubi.bin sysupgrade.bin
+  # Reference TCBOOT recovery format: an 8 MiB FIT slot followed by UBI.
   IMAGE/factory.bin := append-kernel | pad-to $$$$(KERNEL_SIZE) | \
     nokia-tcboot-pon-placeholders | append-ubi | check-size
+  # Match the raw UBI size limit used by the tcboot reference images.
+  IMAGE/factory-ubi.bin := nokia-tcboot-pon-placeholders | append-ubi | check-size 258048k
   IMAGE/sysupgrade.bin := sysupgrade-tar | append-metadata | check-size
   DEVICE_PACKAGES += nand-utils ubi-utils
 endef
+
+define Device/nokia_xg-040g-md-tcboot
+  $(call Device/nokia_xg-040g-md-common)
+  DEVICE_VARIANT := (tcboot)
+  DEVICE_DESCRIPTION := For an existing TCBOOT U-Boot installation. Layout 2.0 starts with raw UBI. \
+    Back up and restore this device's bosa and ri volumes when using factory recovery.
+  DEVICE_DTS := an7581-nokia_xg-040g-md-tcboot
+  SOC := an7581
+  KERNEL_LOADADDR := 0x80200000
+  IMAGE_SIZE := 258048k
+  KERNEL_IN_UBI := 1
+  UBINIZE_OPTS := -s 2048
+  # Match the bootloader volume IDs: bosa=0, ri=1, kernel=2, rootfs=3.
+  UBINIZE_PARTS := bosa ri
+  DEVICE_COMPAT_VERSION := 2.0
+  DEVICE_COMPAT_MESSAGE := UBI volume IDs changed. Reinstall through tcboot recovery and restore the device bosa and ri backups.
+  IMAGES := factory.bin sysupgrade.bin
+  IMAGE/factory.bin := append-ubi | check-size
+  IMAGE/sysupgrade.bin := sysupgrade-tar | append-metadata | check-size
+  DEVICE_PACKAGES += airoha-en7581-npu-firmware nand-utils ubi-utils
+endef
 TARGET_DEVICES += nokia_xg-040g-md-tcboot
+
+define Device/nokia_xg-140g-tf-tcboot
+  $(call Device/nokia_xg-040g-tf-common)
+  $(call Device/nokia-tcboot-images)
+  DEVICE_MODEL := XG-140G-TF
+  DEVICE_DTS := an7581-nokia_xg-140g-tf-tcboot
+  KERNEL_LOADADDR := 0x80200000
+endef
+TARGET_DEVICES += nokia_xg-140g-tf-tcboot
 
 define Device/quantum_q1000k-ubi
   DEVICE_VENDOR := Quantum Fiber

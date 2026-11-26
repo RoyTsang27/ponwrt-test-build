@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only OR MIT
 
 #include "an7581-nokia_xg-040g-md-common.dtsi"
+#include "an7581-nokia-tcboot-parts.dtsi"
 
 / {
 	model = "Nokia XG-040G-MD (tcboot)";
@@ -8,62 +9,35 @@
 		     "airoha,en7581";
 
 	chosen {
-		bootargs = "ubi.mtd=ubi root=ubi0:rootfs rootfstype=squashfs ro rootwait console=ttyS0,115200 earlycon";
+		bootargs = "console=ttyS0,115200 earlycon ubi.mtd=ubi,2048 rootfstype=squashfs ubi.block=0,rootfs ro root=/dev/ubiblock0_3 init=/etc/preinit";
 	};
 };
 
-&partitions {
-	partition@0 {
-		label = "bootloader";
-		reg = <0x0 0x80000>;
-		read-only;
-	};
+&gdm1 {
+	nvmem-cells = <&macaddr_factory_3e 0>;
+};
 
-	partition@80000 {
-		label = "env";
-		reg = <0x80000 0x80000>;
-	};
+&gdm4 {
+	nvmem-cells = <&macaddr_factory_3e 1>;
+};
 
-	partition@100000 {
-		label = "ubi";
-		reg = <0x100000 0xff00000>;
-		compatible = "linux,ubi";
+&gsw_phy2 {
+	/delete-property/ interrupts;
+};
 
-		/* Preserve the existing PON calibration and identity bindings. */
-		volumes {
-			pon_calibration_storage: ubi-volume-bosa {
-				volname = "bosa";
+&gsw_phy3 {
+	/delete-property/ interrupts;
+};
 
-				nvmem-layout {
-					compatible = "fixed-layout";
-					#address-cells = <1>;
-					#size-cells = <1>;
+&gsw_phy4 {
+	/delete-property/ interrupts;
+};
 
-					pon_calibration: calibration@2 {
-						reg = <0x2 0x200>;
-					};
-				};
-			};
+&led_power_green {
+	default-state = "on";
+};
 
-			ubi-volume-ri {
-				volname = "ri";
-
-				nvmem-layout {
-					compatible = "fixed-layout";
-					#address-cells = <1>;
-					#size-cells = <1>;
-
-					pon_serial: pon-serial@1a {
-						reg = <0x1a 0xc>;
-					};
-
-					macaddr_factory_3e: macaddr@3e {
-						compatible = "mac-base";
-						reg = <0x3e 0x6>;
-						#nvmem-cell-cells = <1>;
-					};
-				};
-			};
-		};
-	};
+&npu {
+	firmware-name = "airoha/en7581_npu_rv32.bin",
+			"airoha/en7581_npu_data.bin";
 };
