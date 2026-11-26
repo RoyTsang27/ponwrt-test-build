@@ -26,6 +26,7 @@
 			function = LED_FUNCTION_WLAN;
 			/* The active-low wireless LED is connected to GPIO15. */
 			gpios = <&en7581_pinctrl 15 GPIO_ACTIVE_LOW>;
+			linux,default-trigger = "phy0radio";
 		};
 
 		led-usb2 {
@@ -119,6 +120,7 @@
 		wifi@0,0 {
 			compatible = "mediatek,mt76";
 			reg = <0x0000 0 0 0 0>;
+			mediatek,eeprom-template = "mediatek/znxt-zn515-mt7916-eeprom.bin";
 			mediatek,eeprom-merge-otp;
 			airoha,npu = <&npu>;
 			airoha,eth = <&eth>;

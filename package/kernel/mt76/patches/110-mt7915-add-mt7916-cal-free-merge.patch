@@ -4,7 +4,9 @@ Subject: [PATCH] wifi: mt76: mt7915: merge MT7916 cal-free OTP data
 Some MT7916 boards store a generic 4096-byte EEPROM template in the root
 filesystem and keep only per-chip iCal fields in eFuse.  Add the MT7916 field
 map and gate the merge with the existing
-mediatek,eeprom-merge-otp device-tree property.
+mediatek,eeprom-merge-otp device-tree property. Load an explicit board
+template when provided so an otherwise valid OTP header does not bypass
+the board configuration and other MT7916 boards keep their own defaults.
 
 Signed-off-by: pbs05 <27010143+pbs05@users.noreply.github.com>
 
@@ -18,10 +20,35 @@ Signed-off-by: pbs05 <27010143+pbs05@users.noreply.github.com>
  #include <linux/moduleparam.h>
  #include "mt7915.h"
  #include "eeprom.h"
-@@ -119,6 +120,112 @@ out:
- 	return ret;
+@@ -95,18 +96,18 @@
  }
  
+ static int
+-mt7915_eeprom_load_default(struct mt7915_dev *dev)
++mt7915_eeprom_load_default(struct mt7915_dev *dev, const char *name)
+ {
+ 	u8 *eeprom = dev->mt76.eeprom.data;
+ 	const struct firmware *fw = NULL;
+ 	int ret;
+ 
+-	ret = request_firmware(&fw, mt7915_eeprom_name(dev), dev->mt76.dev);
++	ret = request_firmware(&fw, name, dev->mt76.dev);
+ 	if (ret)
+ 		return ret;
+ 
+-	if (!fw || !fw->data) {
+-		dev_err(dev->mt76.dev, "Invalid default bin\n");
++	if (!fw || !fw->data || fw->size < mt7915_eeprom_size(dev)) {
++		dev_err(dev->mt76.dev, "Invalid EEPROM template %s\n", name);
+ 		ret = -EINVAL;
+ 		goto out;
+ 	}
+@@ -118,6 +119,112 @@
+ 	release_firmware(fw);
+ 
+ 	return ret;
++}
++
 +static int mt7916_read_otp_byte(struct mt7915_dev *dev, u16 offset, u8 *val)
 +{
 +	u8 block[MT7915_EEPROM_BLOCK_SIZE];
@@ -126,21 +153,47 @@ Signed-off-by: pbs05 <27010143+pbs05@users.noreply.github.com>
 +
 +	dev_info(dev->mt76.dev, "merged MT7916 iCal data from eFuse\n");
 +	return 0;
-+}
-+
- static int mt7915_eeprom_load(struct mt7915_dev *dev)
- {
- 	int ret;
-@@ -280,6 +386,12 @@ int mt7915_eeprom_init(struct mt7915_dev
- 			return ret;
- 	}
+ }
  
+ static int mt7915_eeprom_load(struct mt7915_dev *dev)
+@@ -266,17 +373,33 @@
+ 
+ int mt7915_eeprom_init(struct mt7915_dev *dev)
+ {
++	const char *template;
+ 	int ret;
+ 
+-	ret = mt7915_eeprom_load(dev);
+-	if (ret < 0) {
+-		if (ret != -EINVAL)
++	if (is_mt7916(&dev->mt76) &&
++	    !of_property_read_string(dev->mt76.dev->of_node,
++				     "mediatek,eeprom-template", &template)) {
++		ret = mt76_eeprom_init(&dev->mt76, mt7915_eeprom_size(dev));
++		if (ret < 0)
+ 			return ret;
+ 
+-		dev_warn(dev->mt76.dev, "eeprom load fail, use default bin\n");
+-		ret = mt7915_eeprom_load_default(dev);
+-		if (ret)
+-			return ret;
++		ret = mt7915_eeprom_load_default(dev, template);
++		if (!ret)
++			ret = mt7915_check_eeprom(dev);
++	} else {
++		ret = mt7915_eeprom_load(dev);
++		if (ret == -EINVAL) {
++			dev_warn(dev->mt76.dev, "eeprom load fail, use default bin\n");
++			ret = mt7915_eeprom_load_default(dev, mt7915_eeprom_name(dev));
++		}
++	}
++	if (ret)
++		return ret;
++
 +	ret = mt7916_merge_cal_free_otp(dev);
 +	if (ret) {
 +		dev_err(dev->mt76.dev, "failed to merge MT7916 iCal: %d\n", ret);
 +		return ret;
-+	}
-+
+ 	}
+ 
  	mt7915_eeprom_load_precal(dev);
- 	mt7915_eeprom_parse_hw_cap(dev, &dev->phy);
- 	memcpy(dev->mphy.macaddr, dev->mt76.eeprom.data + MT_EE_MAC_ADDR,

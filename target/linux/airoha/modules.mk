@@ -22,4 +22,13 @@ endef
 
 $(eval $(call KernelPackage,pwm-airoha))
 
+define KernelPackage/sound-soc-an7581-wm8960
+  SUBMENU:=Sound Support
+  TITLE:=Airoha AN7581 audio with WM8960 codec
+  DEPENDS:=@TARGET_airoha_an7581 +kmod-sound-soc-wm8960
+  KCONFIG:=CONFIG_SND_SOC_AN7581_WM8960
+  FILES:=$(LINUX_DIR)/sound/soc/mediatek/an7581/an7581-wm8960.ko
+  AUTOLOAD:=$(call AutoProbe,an7581-wm8960)
+endef
 
+$(eval $(call KernelPackage,sound-soc-an7581-wm8960))

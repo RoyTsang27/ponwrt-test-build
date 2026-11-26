@@ -56,7 +56,8 @@ define Device/airoha_an7581-evb
   $(call Device/FitImageLzma)
   DEVICE_VENDOR := Airoha
   DEVICE_MODEL := AN7581 Evaluation Board (SNAND)
-  DEVICE_PACKAGES := kmod-leds-pwm kmod-pwm-airoha kmod-input-gpio-keys-polled
+  DEVICE_PACKAGES := kmod-leds-pwm kmod-pwm-airoha kmod-input-gpio-keys-polled \
+    kmod-mt7992-firmware wpad-openssl
   DEVICE_DTS := an7581-evb
   DEVICE_DTS_CONFIG := config@1
   IMAGE/sysupgrade.bin := append-kernel | pad-to 128k | append-rootfs | pad-rootfs | append-metadata
@@ -66,27 +67,28 @@ define Device/airoha_an7581-evb
 endef
 TARGET_DEVICES += airoha_an7581-evb
 
-define Device/airoha_an7581-evb-emmc-eagle
+define Device/airoha_an7581-evb-emmc
   DEVICE_VENDOR := Airoha
-  DEVICE_MODEL := AN7581 Evaluation Board (eMMC + Eagle)
-  DEVICE_DTS := an7581-evb-emmc-eagle
-  DEVICE_PACKAGES := airoha-en7581-mt7996-npu-firmware \
-		    kmod-mt7996-firmware wpad-openssl
+  DEVICE_PACKAGES := aeonsemi-as21xxx-firmware kmod-sound-soc-an7581-wm8960 \
+    kmod-usb3 wpad-openssl $(AIROHA_USB_STORAGE_PACKAGES)
   ARTIFACT/preloader.bin := an7581-preloader rfb
   ARTIFACT/bl31-uboot.fip := an7581-bl31-uboot rfb
   ARTIFACTS := preloader.bin bl31-uboot.fip
 endef
+
+define Device/airoha_an7581-evb-emmc-eagle
+  $(call Device/airoha_an7581-evb-emmc)
+  DEVICE_MODEL := AN7581 Evaluation Board (eMMC + Eagle)
+  DEVICE_DTS := an7581-evb-emmc-eagle
+  DEVICE_PACKAGES += airoha-en7581-mt7996-npu-firmware kmod-mt7996-firmware
+endef
 TARGET_DEVICES += airoha_an7581-evb-emmc-eagle
 
 define Device/airoha_an7581-evb-emmc-kite
-  DEVICE_VENDOR := Airoha
+  $(call Device/airoha_an7581-evb-emmc)
   DEVICE_MODEL := AN7581 Evaluation Board (eMMC + Kite)
   DEVICE_DTS := an7581-evb-emmc-kite
-  DEVICE_PACKAGES := airoha-en7581-npu-firmware \
-		    kmod-mt7992-firmware wpad-openssl
-  ARTIFACT/preloader.bin := an7581-preloader rfb
-  ARTIFACT/bl31-uboot.fip := an7581-bl31-uboot rfb
-  ARTIFACTS := preloader.bin bl31-uboot.fip
+  DEVICE_PACKAGES += airoha-en7581-npu-firmware kmod-mt7992-firmware
 endef
 TARGET_DEVICES += airoha_an7581-evb-emmc-kite
 
@@ -160,7 +162,7 @@ define Device/nokia_valyrian
   DEVICE_PACKAGES := kmod-spi-gpio kmod-gpio-nxp-74hc164 kmod-leds-gpio \
     kmod-i2c-gpio kmod-iio-richtek-rtq6056 \
     kmod-sfp aeonsemi-as21xxx-firmware \
-    kmod-mt7996-firmware airoha-en7581-mt7996-npu-firmware \
+    kmod-mt7996-firmware airoha-en7581-mt7996-npu-firmware wpad-openssl \
     kmod-usb3 $(AIROHA_USB_STORAGE_PACKAGES)
   ARTIFACT/preloader.bin := an7581-preloader nokia_valyrian
   ARTIFACT/bl31-uboot.fip := an7581-bl31-uboot nokia_valyrian
@@ -209,6 +211,7 @@ define Device/fiberhome_hg5585f-common
   IMAGES := sysupgrade.itb
   # PON and MT7916D read per-device calibration from factory UBI NVMEM cells.
   DEVICE_PACKAGES := kmod-gpio-button-hotplug kmod-leds-gpio kmod-usb3 \
+    kmod-usb-ledtrig-usbport \
     kmod-airoha-paged-bosa kmod-airoha-xpon airoha-ponctl airoha-pond \
 	 kmod-mt7915e kmod-mt7916-firmware wpad-openssl \
 	 fitblk nand-utils ubi-utils $(AIROHA_USB_STORAGE_PACKAGES)
@@ -305,8 +308,9 @@ define Device/znxt_zn504xg-d
   DEVICE_MODEL := ZN504XG-D
   DEVICE_DTS := an7581-znxt-zn504xg-d
   DEVICE_PACKAGES := kmod-gpio-button-hotplug kmod-leds-gpio \
+    kmod-usb3 kmod-usb-ledtrig-usbport \
     kmod-phy-airoha-en8811h kmod-airoha-en7572 kmod-airoha-xpon \
-    airoha-ponctl airoha-pond nand-utils ubi-utils
+    airoha-ponctl airoha-pond nand-utils ubi-utils $(AIROHA_USB_STORAGE_PACKAGES)
   DEVICE_PACKAGES += fitblk
 endef
 TARGET_DEVICES += znxt_zn504xg-d
