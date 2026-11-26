@@ -1,7 +1,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=znxt-zn515-mt7916-eeprom
-PKG_RELEASE:=1
+PKG_RELEASE:=2
 
 include $(INCLUDE_DIR)/package.mk
 
@@ -22,7 +22,7 @@ endef
 define Package/znxt-zn515-mt7916-eeprom/install
 	$(INSTALL_DIR) $(1)/lib/firmware/mediatek
 	$(INSTALL_DATA) ./files/mt7916_eeprom.bin \
-		$(1)/lib/firmware/mediatek/mt7916_eeprom.bin
+		$(1)/lib/firmware/mediatek/znxt-zn515-mt7916-eeprom.bin
 endef
 
 $(eval $(call BuildPackage,znxt-zn515-mt7916-eeprom))

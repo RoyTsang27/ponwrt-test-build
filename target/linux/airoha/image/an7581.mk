@@ -56,7 +56,8 @@ define Device/airoha_an7581-evb
   $(call Device/FitImageLzma)
   DEVICE_VENDOR := Airoha
   DEVICE_MODEL := AN7581 Evaluation Board (SNAND)
-  DEVICE_PACKAGES := kmod-leds-pwm kmod-pwm-airoha kmod-input-gpio-keys-polled
+  DEVICE_PACKAGES := kmod-leds-pwm kmod-pwm-airoha kmod-input-gpio-keys-polled \
+    kmod-mt7992-firmware wpad-openssl
   DEVICE_DTS := an7581-evb
   DEVICE_DTS_CONFIG := config@1
   IMAGE/sysupgrade.bin := append-kernel | pad-to 128k | append-rootfs | pad-rootfs | append-metadata
@@ -66,27 +67,28 @@ define Device/airoha_an7581-evb
 endef
 TARGET_DEVICES += airoha_an7581-evb
 
-define Device/airoha_an7581-evb-emmc-eagle
+define Device/airoha_an7581-evb-emmc
   DEVICE_VENDOR := Airoha
-  DEVICE_MODEL := AN7581 Evaluation Board (eMMC + Eagle)
-  DEVICE_DTS := an7581-evb-emmc-eagle
-  DEVICE_PACKAGES := airoha-en7581-mt7996-npu-firmware \
-		    kmod-mt7996-firmware wpad-openssl
+  DEVICE_PACKAGES := aeonsemi-as21xxx-firmware kmod-sound-soc-an7581-wm8960 \
+    kmod-usb3 wpad-openssl $(AIROHA_USB_STORAGE_PACKAGES)
   ARTIFACT/preloader.bin := an7581-preloader rfb
   ARTIFACT/bl31-uboot.fip := an7581-bl31-uboot rfb
   ARTIFACTS := preloader.bin bl31-uboot.fip
 endef
+
+define Device/airoha_an7581-evb-emmc-eagle
+  $(call Device/airoha_an7581-evb-emmc)
+  DEVICE_MODEL := AN7581 Evaluation Board (eMMC + Eagle)
+  DEVICE_DTS := an7581-evb-emmc-eagle
+  DEVICE_PACKAGES += airoha-en7581-mt7996-npu-firmware kmod-mt7996-firmware
+endef
 TARGET_DEVICES += airoha_an7581-evb-emmc-eagle
 
 define Device/airoha_an7581-evb-emmc-kite
-  DEVICE_VENDOR := Airoha
+  $(call Device/airoha_an7581-evb-emmc)
   DEVICE_MODEL := AN7581 Evaluation Board (eMMC + Kite)
   DEVICE_DTS := an7581-evb-emmc-kite
-  DEVICE_PACKAGES := airoha-en7581-npu-firmware \
-		    kmod-mt7992-firmware wpad-openssl
-  ARTIFACT/preloader.bin := an7581-preloader rfb
-  ARTIFACT/bl31-uboot.fip := an7581-bl31-uboot rfb
-  ARTIFACTS := preloader.bin bl31-uboot.fip
+  DEVICE_PACKAGES += airoha-en7581-npu-firmware kmod-mt7992-firmware
 endef
 TARGET_DEVICES += airoha_an7581-evb-emmc-kite
 
@@ -160,7 +162,7 @@ define Device/nokia_valyrian
   DEVICE_PACKAGES := kmod-spi-gpio kmod-gpio-nxp-74hc164 kmod-leds-gpio \
     kmod-i2c-gpio kmod-iio-richtek-rtq6056 \
     kmod-sfp aeonsemi-as21xxx-firmware \
-    kmod-mt7996-firmware airoha-en7581-mt7996-npu-firmware \
+    kmod-mt7996-firmware airoha-en7581-mt7996-npu-firmware wpad-openssl \
     kmod-usb3 $(AIROHA_USB_STORAGE_PACKAGES)
   ARTIFACT/preloader.bin := an7581-preloader nokia_valyrian
   ARTIFACT/bl31-uboot.fip := an7581-bl31-uboot nokia_valyrian
@@ -209,6 +211,7 @@ define Device/fiberhome_hg5585f-common
   IMAGES := sysupgrade.itb
   # PON and MT7916D read per-device calibration from factory UBI NVMEM cells.
   DEVICE_PACKAGES := kmod-gpio-button-hotplug kmod-leds-gpio kmod-usb3 \
+    kmod-usb-ledtrig-usbport \
     kmod-airoha-paged-bosa kmod-airoha-xpon airoha-ponctl airoha-pond \
 	 kmod-mt7915e kmod-mt7916-firmware wpad-openssl \
 	 fitblk nand-utils ubi-utils $(AIROHA_USB_STORAGE_PACKAGES)
@@ -305,8 +308,9 @@ define Device/znxt_zn504xg-d
   DEVICE_MODEL := ZN504XG-D
   DEVICE_DTS := an7581-znxt-zn504xg-d
   DEVICE_PACKAGES := kmod-gpio-button-hotplug kmod-leds-gpio \
+    kmod-usb3 kmod-usb-ledtrig-usbport \
     kmod-phy-airoha-en8811h kmod-airoha-en7572 kmod-airoha-xpon \
-    airoha-ponctl airoha-pond nand-utils ubi-utils
+    airoha-ponctl airoha-pond nand-utils ubi-utils $(AIROHA_USB_STORAGE_PACKAGES)
   DEVICE_PACKAGES += fitblk
 endef
 TARGET_DEVICES += znxt_zn504xg-d
@@ -420,15 +424,16 @@ endef
 TARGET_DEVICES += nokia_xg-040g-md-ubi-usb-sfp
 
 define Build/nokia-tcboot-pon-placeholders
-  head -c 262144 /dev/zero | tr '\000' '\377' > $(KDIR)/nokia-tcboot-empty-pon-data.bin
+  head -c 262144 /dev/zero | LC_ALL=C tr '\000' '\377' > $@.pon-data && \
+    mv $@.pon-data $(KDIR)/nokia-tcboot-empty-pon-data.bin
 endef
 
-define Device/nokia_xg-040g-md-tcboot
-  $(call Device/nokia_xg-040g-md-common)
+define Device/nokia-tcboot-images
   DEVICE_VARIANT := (tcboot)
-  DEVICE_DTS := an7581-nokia_xg-040g-md-tcboot
+  DEVICE_DESCRIPTION := For an existing TCBOOT U-Boot installation with bootloader/env/ubi partitions. \
+    Builds FIT-prefixed factory.bin, raw factory-ubi.bin and signed sysupgrade.bin images. \
+    Back up and restore this device's bosa and ri volumes when using factory recovery.
   SOC := an7581
-  KERNEL_LOADADDR := 0x80088000
   KERNEL_SIZE := 8192k
   IMAGE_SIZE := 261120k
   KERNEL_IN_UBI := 1
@@ -436,13 +441,46 @@ define Device/nokia_xg-040g-md-tcboot
   # Reserve personal-data volumes before rootfs_data consumes the free space.
   UBINIZE_PARTS_AFTER := bosa=:$(KDIR)/nokia-tcboot-empty-pon-data.bin \
     ri=:$(KDIR)/nokia-tcboot-empty-pon-data.bin
-  IMAGES := factory.bin sysupgrade.bin
+  IMAGES := factory.bin factory-ubi.bin sysupgrade.bin
+  # Reference TCBOOT recovery format: an 8 MiB FIT slot followed by UBI.
   IMAGE/factory.bin := append-kernel | pad-to $$$$(KERNEL_SIZE) | \
     nokia-tcboot-pon-placeholders | append-ubi | check-size
+  # Match the raw UBI size limit used by the tcboot reference images.
+  IMAGE/factory-ubi.bin := nokia-tcboot-pon-placeholders | append-ubi | check-size 258048k
   IMAGE/sysupgrade.bin := sysupgrade-tar | append-metadata | check-size
   DEVICE_PACKAGES += nand-utils ubi-utils
 endef
+
+define Device/nokia_xg-040g-md-tcboot
+  $(call Device/nokia_xg-040g-md-common)
+  DEVICE_VARIANT := (tcboot)
+  DEVICE_DESCRIPTION := For an existing TCBOOT U-Boot installation. Layout 2.0 starts with raw UBI. \
+    Back up and restore this device's bosa and ri volumes when using factory recovery.
+  DEVICE_DTS := an7581-nokia_xg-040g-md-tcboot
+  SOC := an7581
+  KERNEL_LOADADDR := 0x80200000
+  IMAGE_SIZE := 258048k
+  KERNEL_IN_UBI := 1
+  UBINIZE_OPTS := -s 2048
+  # Match the bootloader volume IDs: bosa=0, ri=1, kernel=2, rootfs=3.
+  UBINIZE_PARTS := bosa ri
+  DEVICE_COMPAT_VERSION := 2.0
+  DEVICE_COMPAT_MESSAGE := UBI volume IDs changed. Reinstall through tcboot recovery and restore the device bosa and ri backups.
+  IMAGES := factory.bin sysupgrade.bin
+  IMAGE/factory.bin := append-ubi | check-size
+  IMAGE/sysupgrade.bin := sysupgrade-tar | append-metadata | check-size
+  DEVICE_PACKAGES += airoha-en7581-npu-firmware nand-utils ubi-utils
+endef
 TARGET_DEVICES += nokia_xg-040g-md-tcboot
+
+define Device/nokia_xg-140g-tf-tcboot
+  $(call Device/nokia_xg-040g-tf-common)
+  $(call Device/nokia-tcboot-images)
+  DEVICE_MODEL := XG-140G-TF
+  DEVICE_DTS := an7581-nokia_xg-140g-tf-tcboot
+  KERNEL_LOADADDR := 0x80200000
+endef
+TARGET_DEVICES += nokia_xg-140g-tf-tcboot
 
 define Device/quantum_q1000k-ubi
   DEVICE_VENDOR := Quantum Fiber

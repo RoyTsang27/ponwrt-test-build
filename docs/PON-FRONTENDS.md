@@ -20,7 +20,7 @@ it. The supplied manifest alone therefore cannot prove that the flashed image
 lacks the module, or establish a Linux 6.18.58 regression.
 
 The supplied configurations now explicitly select the required frontends as
-`y`, including the single-device tcboot and MF UBI configurations. This installs
+`y`, including the dedicated tcboot and MF UBI configurations. This installs
 them in the shared rootfs as well as the device images, and avoids depending on
 per-device additions for the optical frontend. The AN7581 multi-device config
 includes both frontend packages because it selects both board families; each
@@ -35,20 +35,21 @@ rendering. Backend messages are rendered as text. Read-only users gain the ubus
 `file.exec` method needed for these existing, explicitly allowlisted status
 commands; board writes and diagnostic bundles still require write permission.
 
-All 24 AN7581/AN7583 profiles were checked by resolving Make inheritance and
+All 25 AN7581/AN7583 profiles were checked by resolving Make inheritance and
 following local device-tree includes and the `optical-front-end` phandle:
 
 | Required frontend | Device profiles |
 | --- | --- |
-| EN7572 (11) | `gemtek_xg2010g`, `znxt_zn515xg-d`, `znxt_zn504xg-d`, `unionman_ung00a`, `h3c_hm2004-du`, `nokia_xg-040g-md-ubi`, `nokia_xg-040g-md-ubi-usb-sfp`, `nokia_xg-040g-md-tcboot`, `nokia_xg-040g-tf-ubi`, `nokia_xg-040g-mf`, `nokia_xg-040g-mf-ubi` |
+| EN7572 (12) | `gemtek_xg2010g`, `znxt_zn515xg-d`, `znxt_zn504xg-d`, `unionman_ung00a`, `h3c_hm2004-du`, `nokia_xg-040g-md-ubi`, `nokia_xg-040g-md-ubi-usb-sfp`, `nokia_xg-040g-md-tcboot`, `nokia_xg-040g-tf-ubi`, `nokia_xg-140g-tf-tcboot`, `nokia_xg-040g-mf`, `nokia_xg-040g-mf-ubi` |
 | Paged-BOSA / GN28L95 / UX3363 (5) | `fiberhome_hg5382a`, `fiberhome_hg5585f-ct`, `fiberhome_hg5585f-cu`, `fiberhome_hg5585f-ct-usb-sfp`, `fiberhome_hg5585f-cu-usb-sfp` |
 | Integrated PON disabled (8) | `airoha_an7581-evb`, `airoha_an7581-evb-emmc-eagle`, `airoha_an7581-evb-emmc-kite`, `gemtek_w1700k-ubi`, `nokia_valyrian`, `quantum_q1000k-ubi`, `airoha_an7583-evb`, `airoha_an7583-evb-emmc` |
 
 Every enabled PON profile already had the matching frontend in `DEVICE_PACKAGES`.
 CI now rejects a missing profile default, an unresolved package selection, or a
-per-device override removing the required frontend. Its single-device MD tcboot
-and MF UBI builds additionally check the actual staged rootfs for xPON, frontend
-core, frontend module, and EN7572 firmware, then verify image signatures.
+per-device override removing the required frontend. The MD and TF tcboot builds
+check each image's rootfs for xPON, frontend core, frontend module, and EN7572
+firmware. The MF UBI build checks its staged rootfs. CI verifies sysupgrade
+signatures for all three profiles.
 
 For the existing MF UBI checkout, set `CONFIG_PACKAGE_kmod-airoha-en7572=y` in
 `.config`, preserving other configuration choices, then run:

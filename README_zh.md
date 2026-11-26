@@ -22,12 +22,15 @@ PonWrt 是一个用于研究和开发的开源光猫固件项目。
 | AN7581 | FiberHome HG5585F CT | `fiberhome_hg5585f-ct` | `factory` |
 | AN7581 | FiberHome HG5585F CU | `fiberhome_hg5585f-cu` | `factory` |
 | AN7581 | Gemtek XG2010G | `gemtek_xg2010g` | `dsd` |
+| AN7581 | Nokia XG-040G-MD tcboot | `nokia_xg-040g-md-tcboot` | `bosa`、`ri`（UBI 卷） |
 | AN7581 | Nokia XG-040G-MD UBI | `nokia_xg-040g-md-ubi` | `bosa`、`ri` |
 | AN7581 | Nokia XG-040G-TF UBI | `nokia_xg-040g-tf-ubi` | `bosa`、`ri` |
+| AN7581 | Nokia XG-140G-TF tcboot | `nokia_xg-140g-tf-tcboot` | `bosa`、`ri`（UBI 卷） |
 | AN7581 | UnionMan UNG00A | `unionman_ung00a` | `reservearea` |
 | AN7581 | ZNXT ZN504XG-D | `znxt_zn504xg-d` | `reservearea` |
 | AN7581 | ZNXT ZN515XG-D | `znxt_zn515xg-d` | `reservearea` |
 | AN7583 | Nokia XG-040G-MF | `nokia_xg-040g-mf`、`nokia_xg-040g-mf-ubi` | `bosa`、`ri` |
+| ZX279133 | Skyworth SK-D840N | `skyworth_sk-d840n` | Native241 `parameter tags` 分区 |
 
 ## 编译
 
@@ -88,6 +91,8 @@ make -j2 V=s
 发布流程固定 feeds 的提交版本，开发构建的 feeds 继续跟随上游。
 
 ## 刷入
+
+已安装 Nokia tcboot U-Boot 的设备请参阅 [tcboot 编译与镜像指南](docs/XG-040G-MD-TCBOOT.md)。
 
 使用 [AN758x-Stock2UBI](https://github.com/pbs05/an758x-stock2ubi) 备份原厂闪存并安装 UBI 布局。启动镜像和 Web 恢复界面由 [AN758x U-Boot](https://github.com/pbs05/uboot-an758x) 提供。
 
