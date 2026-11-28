@@ -16,6 +16,11 @@ while IFS= read -r -d '' image; do
     staging_dir/host/bin/fwtool -q -s "$verify_dir/certificate" "$image"
     staging_dir/host/bin/fwtool -q -T -s /dev/null "$image" |
         staging_dir/host/bin/ucert -V -m - -c "$verify_dir/certificate" -P "$verify_dir/keys"
+    case "$image" in
+        *-znxt_zn515xg-d-squashfs-sysupgrade.itb)
+            python3 scripts/check-pon-profiles.py --zn515-image "$image"
+            ;;
+    esac
     count=$((count + 1))
 done < <(find "$target_dir" -type f \( -name '*-sysupgrade.bin' -o -name '*-sysupgrade.itb' \) -print0)
 

@@ -296,10 +296,10 @@ define Device/znxt_zn515xg-d
   DEVICE_PACKAGES := kmod-gpio-button-hotplug kmod-leds-gpio \
     kmod-usb3 kmod-usb-ledtrig-usbport kmod-phy-airoha-en8811h \
     kmod-airoha-en7572 kmod-airoha-xpon airoha-ponctl airoha-pond \
-    kmod-mt7915e kmod-mt7916-firmware znxt-zn515-mt7916-eeprom \
-    wpad-openssl \
     nand-utils ubi-utils $(AIROHA_USB_STORAGE_PACKAGES)
-  DEVICE_PACKAGES += fitblk
+  # The MT7916D uses mt7915e and a separate board EEPROM template.
+  DEVICE_PACKAGES += kmod-mt7915e kmod-mt7916-firmware \
+    znxt-zn515-mt7916-eeprom wpad-openssl fitblk
 endef
 TARGET_DEVICES += znxt_zn515xg-d
 

@@ -59,6 +59,23 @@ class PonProfileTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'override removes required'):
                 profiles.check_config(config, self.boards)
 
+    def test_zn515_requires_wifi_packages_in_resolved_config(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config = Path(directory) / '.config'
+            source = (ROOT / 'configs/an7581.config').read_text()
+            profile_packages = 'CONFIG_TARGET_DEVICE_PACKAGES_airoha_an7581_DEVICE_znxt_zn515xg-d'
+            config.write_text(source)
+            profiles.check_config(config, self.boards)
+            for package in profiles.ZN515_WIFI_PACKAGES:
+                with self.subTest(package=package):
+                    config.write_text(source.replace(f'CONFIG_PACKAGE_{package}=m\n', ''))
+                    with self.assertRaisesRegex(ValueError, 'select CONFIG_PACKAGE_' + package):
+                        profiles.check_config(config, self.boards)
+                    config.write_text(source.replace(f'{profile_packages}=""',
+                                                     f'{profile_packages}="-{package}"'))
+                    with self.assertRaisesRegex(ValueError, 'device override removes required ' + package):
+                        profiles.check_config(config, self.boards)
+
     def test_provider_phandle_not_unrelated_i2c_node_determines_frontend(self):
         source = '''
         xpon_mac: xpon-mac@1 { status = "disabled"; };
@@ -95,6 +112,30 @@ class PonProfileTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, 'missing firmware ' + name):
                     profiles.check_rootfs('nokia_xg-040g-mf-ubi', root, self.boards)
                 path.write_bytes(b'firmware fixture')
+
+    def test_zn515_rootfs_requires_driver_and_board_template(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            modules = ('airoha-xpon', 'airoha-pon-frontend-core', 'airoha-en7572') + profiles.ZN515_WIFI_MODULES
+            files = [f'lib/modules/6.18.65/{name}.ko' for name in modules]
+            files += [f'lib/firmware/airoha/en7572/{name}' for name in profiles.FIRMWARE]
+            for name in files + list(profiles.ZN515_WIFI_FILES):
+                path = root / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(b'file fixture')
+
+            eeprom = root / profiles.ZN515_EEPROM
+            with self.assertRaisesRegex(ValueError, 'wrong MT7916D EEPROM template'):
+                profiles.check_rootfs(profiles.ZN515_PROFILE, root, self.boards)
+            source = ROOT / 'package/firmware/znxt-zn515-mt7916-eeprom/files/mt7916_eeprom.bin'
+            eeprom.write_bytes(source.read_bytes())
+            profiles.check_rootfs(profiles.ZN515_PROFILE, root, self.boards)
+            eeprom.unlink()
+            with self.assertRaisesRegex(ValueError, 'missing .*znxt-zn515-mt7916-eeprom'):
+                profiles.check_rootfs(profiles.ZN515_PROFILE, root, self.boards)
+            (root / 'lib/modules/6.18.65/mt7915e.ko').unlink()
+            with self.assertRaisesRegex(ValueError, 'missing module mt7915e'):
+                profiles.check_rootfs(profiles.ZN515_PROFILE, root, self.boards)
 
 
 if __name__ == '__main__':
